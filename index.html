@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://iptv-org.github.io" />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%236d5efc'/%3E%3Cpath d='M30 40h40v28H30z' fill='none' stroke='white' stroke-width='5'/%3E%3Cpath d='M44 28l6 12 6-12' fill='none' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="assets/css/style.css?v=4" />
+  <link rel="stylesheet" href="assets/css/style.css?v=5" />
 </head>
 <body>
   <!-- ===================== Sidebar ===================== -->
@@ -24,6 +24,7 @@
       <button class="nav-item" data-view="categories"><span class="ico">🗂️</span> Categories</button>
       <button class="nav-item" data-view="countries"><span class="ico">🌍</span> Countries</button>
       <button class="nav-item" data-view="multiview"><span class="ico">🔲</span> Multi-view</button>
+      <button class="nav-item" data-view="ondemand"><span class="ico">🎬</span> On Demand</button>
       <button class="nav-item" data-view="favorites"><span class="ico">⭐</span> Favorites</button>
     </nav>
 
@@ -59,14 +60,17 @@
     </header>
 
     <section class="content" id="content">
-      <!-- Hero -->
+      <!-- Hero (cinematic featured) -->
       <div class="hero" id="hero">
-        <div class="hero-text">
-          <h1>Watch the world, live.</h1>
-          <p>Thousands of free, publicly available TV channels — news, sports, movies, music and more. Pick a channel to start streaming instantly.</p>
+        <video class="hero-video" id="heroVideo" muted playsinline></video>
+        <div class="hero-scrim"></div>
+        <div class="hero-inner">
+          <span class="hero-eyebrow" id="heroEyebrow">Welcome to Nova TV</span>
+          <h1 id="heroTitle">Watch the world, live.</h1>
+          <p id="heroDesc">Thousands of free live channels plus an on-demand film library — news, sports, movies, music and more. Tap in and start streaming instantly.</p>
           <div class="hero-actions">
-            <button class="btn btn-primary" id="heroSurprise">🎲 Surprise me</button>
-            <button class="btn btn-ghost" data-view-link="categories">Browse categories</button>
+            <button class="btn btn-primary" id="heroWatch">▶ Watch featured</button>
+            <button class="btn btn-ghost" id="heroSurprise">🎲 Surprise me</button>
           </div>
         </div>
         <div class="hero-stats" id="heroStats"></div>
@@ -95,6 +99,9 @@
         <p class="mv-hint">Watch several channels at once. Tiles start muted — tap 🔇 to listen to one.</p>
         <div class="mv-grid" id="mvGrid"></div>
       </div>
+
+      <!-- On Demand -->
+      <div class="ondemand" id="ondemand" hidden></div>
 
       <div class="state" id="loading" hidden>
         <div class="spinner"></div>
@@ -153,6 +160,18 @@
     </div>
   </div>
 
+  <!-- ===================== Command palette (⌘K) ===================== -->
+  <div class="picker-overlay" id="cmdOverlay" hidden>
+    <div class="picker-card">
+      <div class="picker-head">
+        <span class="search-ico">⌘</span>
+        <input id="cmdInput" type="search" placeholder="Search or jump to… channels, views, actions" autocomplete="off" />
+        <button class="icon-btn close" id="cmdClose" title="Close">✕</button>
+      </div>
+      <div class="picker-results" id="cmdResults"></div>
+    </div>
+  </div>
+
   <!-- ===================== Confirm modal (age gate / experimental) ===================== -->
   <div class="modal-overlay" id="modalOverlay" hidden>
     <div class="modal-card">
@@ -168,6 +187,6 @@
   <div class="toast" id="toast" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
-  <script src="assets/js/app.js?v=4"></script>
+  <script src="assets/js/app.js?v=5"></script>
 </body>
 </html>

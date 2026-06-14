@@ -239,11 +239,14 @@ function renderQuickCategories() {
 function renderHome() {
   setActiveNav("home");
   teardownMultiview();
+  $("#ondemand").hidden = true;
+  state.view = "home";
   $("#hero").hidden = false;
   $("#gridHead").hidden = true;
   $("#grid").innerHTML = "";
   const rows = $("#rows");
   rows.innerHTML = "";
+  ensureHero();
 
   if (state.recent.length) {
     const rec = state.recent.map((id) => state.byId.get(id)).filter(Boolean);
@@ -307,7 +310,12 @@ function buildCard(c) {
 
   const fav = el("button", "card-fav" + (state.favorites.has(c.id) ? " on" : ""), "★");
   fav.title = "Toggle favorite";
-  fav.onclick = (e) => { e.stopPropagation(); toggleFav(c.id); fav.classList.toggle("on"); };
+  fav.onclick = (e) => {
+    e.stopPropagation();
+    toggleFav(c.id); fav.classList.toggle("on");
+    const added = state.favorites.has(c.id);
+    toast(added ? "★ Added to favorites" : "Removed from favorites", "Undo", () => { toggleFav(c.id); fav.classList.toggle("on"); });
+  };
   card.appendChild(fav);
 
   card.appendChild(thumb);
@@ -324,6 +332,9 @@ function buildCard(c) {
 /* ----- Grid views ----- */
 function renderGrid(title, channels) {
   teardownMultiview();
+  pauseHero();
+  $("#ondemand").hidden = true;
+  state.view = "other";
   $("#hero").hidden = true;
   $("#rows").innerHTML = "";
   $("#gridHead").hidden = false;
@@ -355,6 +366,9 @@ function showCountry(code) {
 /* ----- Browse menus (categories / countries lists as chips grid) ----- */
 function renderBrowse(kind) {
   teardownMultiview();
+  pauseHero();
+  $("#ondemand").hidden = true;
+  state.view = "other";
   $("#hero").hidden = true;
   $("#rows").innerHTML = "";
   $("#grid").innerHTML = "";
@@ -547,6 +561,7 @@ function updateSourceBtn() {
 // Mobile browsers block autoplay-with-sound; retry muted so the picture
 // still starts, and the user can unmute with the controls.
 function startPlayback() {
+  startAura(video);
   const p = video.play();
   if (p && p.catch) p.catch(() => { video.muted = true; video.play().catch(() => {}); });
 }
@@ -562,14 +577,15 @@ function playStream(url) {
     if (!nextSource(true)) { $("#playerLoading").style.display = "none"; $("#playerFail").hidden = false; }
   };
 
-  if (window.Hls && Hls.isSupported()) {
+  const isFile = /\.(mp4|m4v|webm|ogv)(\?|$)/i.test(url);   // on-demand video files
+  if (!isFile && window.Hls && Hls.isSupported()) {
     hls = new Hls({ maxBufferLength: 20, manifestLoadingTimeOut: 9000, manifestLoadingMaxRetry: 1 });
     hls.loadSource(url);
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED, onReady);
     hls.on(Hls.Events.ERROR, (_e, data) => { if (data.fatal) onFail(); });
-  } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    // Safari / iOS native HLS (also dodges many CORS issues hls.js hits).
+  } else if (isFile || video.canPlayType("application/vnd.apple.mpegurl")) {
+    // Direct file (mp4/webm) or Safari/iOS native HLS (also dodges CORS).
     video.src = url;
     video.addEventListener("loadedmetadata", onReady, { once: true });
     video.addEventListener("error", onFail, { once: true });
@@ -588,6 +604,8 @@ function closePlayer() {
   $("#playerOverlay").hidden = true;
   document.body.style.overflow = "";
   destroyHls();
+  stopAura();
+  if (state.view === "home") resumeHero(); else auraIdle();
 }
 
 /* ============================================================
@@ -667,7 +685,10 @@ const mvHls = new Map();   // tile index -> Hls instance
 
 function renderMultiview() {
   setActiveNav("multiview");
+  pauseHero();
+  state.view = "other";
   $("#hero").hidden = true;
+  $("#ondemand").hidden = true;
   $("#rows").innerHTML = "";
   $("#gridHead").hidden = true;
   $("#grid").innerHTML = "";
@@ -801,18 +822,261 @@ function renderPicker(q) {
  * Toast
  * ============================================================ */
 let toastTimer;
-function toast(msg) {
+function toast(msg, actionLabel, actionFn) {
   const t = $("#toast");
-  t.textContent = msg;
+  t.innerHTML = "";
+  t.appendChild(document.createTextNode(msg));
+  if (actionLabel && actionFn) {
+    const b = el("button", "toast-action", esc(actionLabel));
+    b.onclick = () => { actionFn(); t.classList.remove("show"); setTimeout(() => (t.hidden = true), 200); };
+    t.appendChild(b);
+  }
   t.hidden = false;
   t.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.classList.remove("show"); setTimeout(() => (t.hidden = true), 250); }, 2200);
+  toastTimer = setTimeout(() => { t.classList.remove("show"); setTimeout(() => (t.hidden = true), 250); }, actionLabel ? 4000 : 2200);
+}
+
+/* ============================================================
+ * Aura chroma engine — the UI tints to on-screen content
+ * ============================================================ */
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const CAT_HUE = { sports: 142, news: 212, movies: 280, music: 330, kids: 38, entertainment: 255, documentary: 188, comedy: 48, business: 205, classic: 30, religious: 265, lifestyle: 160, cooking: 24, travel: 175, science: 200, weather: 198, auto: 8, family: 50, general: 250, education: 210 };
+let auraCanvas, auraCtx, auraRAF = 0, auraVideo = null, auraLast = 0;
+
+function setAura(a1, a2, a3) {
+  const s = document.documentElement.style;
+  s.setProperty("--aura-1", a1); s.setProperty("--aura-2", a2); s.setProperty("--aura-3", a3);
+}
+function auraIdle() { setAura("#7c6cff", "#2dd4bf", "#1b2a6b"); }
+function auraFromChannel(c) {
+  let hue = 250;
+  for (const cat of (c && c.categories) || []) { if (CAT_HUE[cat] != null) { hue = CAT_HUE[cat]; break; } }
+  setAura(`hsl(${hue} 72% 56%)`, `hsl(${(hue + 38) % 360} 64% 46%)`, `hsl(${(hue + 200) % 360} 58% 24%)`);
+}
+function startAura(v) {
+  if (reduceMotion) return;
+  if (!auraCanvas) { auraCanvas = document.createElement("canvas"); auraCanvas.width = 32; auraCanvas.height = 18; auraCtx = auraCanvas.getContext("2d", { willReadFrequently: true }); }
+  auraVideo = v;
+  if (!auraRAF) auraRAF = requestAnimationFrame(auraLoop);
+}
+function stopAura() { auraVideo = null; }
+function auraLoop(t) {
+  auraRAF = requestAnimationFrame(auraLoop);
+  if (!auraVideo) return;
+  if (t - auraLast < 220) return; auraLast = t;
+  const v = auraVideo;
+  if (v.readyState < 2 || !v.videoWidth) return;
+  try {
+    auraCtx.drawImage(v, 0, 0, 32, 18);
+    const d = auraCtx.getImageData(0, 0, 32, 18).data;
+    let r = 0, g = 0, b = 0, n = 0, mr = 0, mg = 0, mb = 0, ms = -1;
+    for (let i = 0; i < d.length; i += 4) {
+      const R = d[i], G = d[i + 1], B = d[i + 2];
+      r += R; g += G; b += B; n++;
+      const sat = Math.max(R, G, B) - Math.min(R, G, B);
+      if (sat > ms) { ms = sat; mr = R; mg = G; mb = B; }
+    }
+    r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
+    const bo = (c) => Math.min(255, Math.round(c * 1.12));
+    setAura(`rgb(${bo(mr)} ${bo(mg)} ${bo(mb)})`, `rgb(${r} ${g} ${b})`, `rgb(${Math.round(r * 0.35)} ${Math.round(g * 0.35)} ${Math.round(b * 0.5)})`);
+  } catch (e) {
+    // tainted canvas (cross-origin video without CORS) → graceful fallback
+    auraVideo = null;
+    if (currentChannel) auraFromChannel(currentChannel); else auraIdle();
+  }
+}
+
+/* ============================================================
+ * Holo tilt — spatial depth on pointer (desktop, motion-safe)
+ * ============================================================ */
+const canHover = matchMedia("(hover: hover) and (pointer: fine)").matches;
+let tiltEl = null;
+function onTiltMove(e) {
+  const t = e.target.closest(".card");
+  if (t !== tiltEl) { if (tiltEl) { tiltEl.style.setProperty("--rx", "0deg"); tiltEl.style.setProperty("--ry", "0deg"); } tiltEl = t; }
+  if (!t) return;
+  const r = t.getBoundingClientRect();
+  const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+  t.style.setProperty("--rx", ((0.5 - py) * 7).toFixed(2) + "deg");
+  t.style.setProperty("--ry", ((px - 0.5) * 9).toFixed(2) + "deg");
+  t.style.setProperty("--mx", (px * 100).toFixed(1) + "%");
+  t.style.setProperty("--my", (py * 100).toFixed(1) + "%");
+}
+
+/* ============================================================
+ * Cinematic featured hero (muted live preview behind the title)
+ * ============================================================ */
+let heroHls = null, heroFeatured = null, heroReady = false;
+
+function streamInto(v, urls, onReady) {
+  let idx = 0, h = null, dead = false;
+  const start = () => {
+    if (dead) return;
+    if (h) { h.destroy(); h = null; }
+    const ok = () => onReady && onReady();
+    const bad = () => { if (idx < urls.length - 1) { idx++; start(); } };
+    const isFile = /\.(mp4|m4v|webm|ogv)(\?|$)/i.test(urls[idx]);
+    if (!isFile && window.Hls && Hls.isSupported()) {
+      h = new Hls({ manifestLoadingTimeOut: 9000, manifestLoadingMaxRetry: 1 });
+      h.loadSource(urls[idx]); h.attachMedia(v);
+      h.on(Hls.Events.MANIFEST_PARSED, ok);
+      h.on(Hls.Events.ERROR, (_e, dd) => { if (dd.fatal) bad(); });
+    } else if (isFile || v.canPlayType("application/vnd.apple.mpegurl")) {
+      v.src = urls[idx]; v.addEventListener("loadedmetadata", ok, { once: true }); v.addEventListener("error", bad, { once: true });
+    } else bad();
+  };
+  start();
+  return { destroy() { dead = true; if (h) h.destroy(); } };
+}
+
+function heroBlurb(c) {
+  const cats = c.categories.map((x) => state.catName.get(x) || x);
+  return `Featured live ${cats[0] ? cats[0].toLowerCase() : "channel"}${c.countryName ? ` from ${c.countryName}` : ""}. Press watch to tune in — or surf the wall.`;
+}
+function setFeaturedHero() {
+  const v = $("#heroVideo");
+  if (heroHls) { heroHls.destroy(); heroHls = null; }
+  const pool = state.channels.filter((c) => c.logo && !c.experimental && !c.nsfw && (c.categories.includes("sports") || c.categories.includes("news") || c.categories.includes("movies")));
+  const arr = pool.length ? pool : state.channels;
+  const c = arr[Math.floor(Math.random() * arr.length)];
+  if (!c) return;
+  heroFeatured = c; heroReady = false;
+  $("#heroEyebrow").innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:var(--accent-2);display:inline-block;box-shadow:0 0 8px var(--accent-2)"></span> Featured · ${esc((c.flag ? c.flag + " " : "") + (c.countryName || "Live"))}`;
+  $("#heroTitle").textContent = c.name;
+  $("#heroDesc").textContent = heroBlurb(c);
+  heroHls = streamInto(v, c.urls, () => { heroReady = true; v.muted = true; v.classList.add("show"); v.play().catch(() => {}); if (state.view === "home") startAura(v); });
+}
+function ensureHero() { if (!heroFeatured) setFeaturedHero(); else resumeHero(); }
+function pauseHero() { const v = $("#heroVideo"); v.pause(); v.classList.remove("show"); if (auraVideo === v) { stopAura(); auraIdle(); } }
+function resumeHero() { const v = $("#heroVideo"); if (heroReady) { v.classList.add("show"); v.play().catch(() => {}); startAura(v); } else if (!heroFeatured) setFeaturedHero(); }
+
+/* ============================================================
+ * On Demand — Internet Archive (public domain) + VOD launchers
+ * ============================================================ */
+const VOD_LAUNCH = [
+  { name: "Tubi", tag: "Free movies & TV", url: "https://tubitv.com", color: "#fa382f", icon: "📺" },
+  { name: "Pluto TV", tag: "Live + on demand", url: "https://pluto.tv/en/on-demand", color: "#2d2d6b", icon: "🅿️" },
+  { name: "Plex", tag: "Free movies & TV", url: "https://watch.plex.tv", color: "#e5a00d", icon: "▶️" },
+  { name: "The Roku Channel", tag: "Free on demand", url: "https://therokuchannel.roku.com", color: "#6f1ab1", icon: "📡" },
+  { name: "Crackle", tag: "Free movies", url: "https://www.crackle.com", color: "#ff7a00", icon: "🎬" },
+  { name: "Internet Archive", tag: "Public-domain films", url: "https://archive.org/details/feature_films", color: "#2a6b9b", icon: "🏛️" },
+];
+const ARCHIVE_ROWS = [
+  ["🎞️ Feature Films", "collection:(feature_films)"],
+  ["📺 Classic TV", "collection:(classic_tv)"],
+  ["👽 Sci-Fi & Horror", "collection:(SciFi_Horror)"],
+  ["🕵️ Film Noir", "collection:(film_noir)"],
+  ["🐭 Cartoons", "collection:(animationandcartoons)"],
+  ["😂 Comedy", "collection:(comedy_films)"],
+];
+
+function renderOnDemand() {
+  setActiveNav("ondemand"); state.view = "other";
+  pauseHero(); teardownMultiview(); auraIdle();
+  $("#hero").hidden = true; $("#rows").innerHTML = ""; $("#gridHead").hidden = true; $("#grid").innerHTML = ""; hide("#empty");
+  const od = $("#ondemand"); od.hidden = false;
+  od.innerHTML =
+    `<div class="od-section"><h2>📲 Free on-demand apps</h2><div class="od-launchers">` +
+    VOD_LAUNCH.map((s) => `<a class="od-launch" href="${s.url}" target="_blank" rel="noopener" style="background:linear-gradient(135deg, ${s.color}, rgba(0,0,0,0.45))"><span class="logo">${s.icon}</span><span>${esc(s.name)}<small>${esc(s.tag)} ↗</small></span></a>`).join("") +
+    `</div></div><div id="odLib"></div>`;
+  const lib = $("#odLib");
+  for (const [title, q] of ARCHIVE_ROWS) {
+    const row = el("div", "od-section");
+    row.innerHTML = `<h2>${esc(title)}</h2><div class="row-scroll"></div>`;
+    lib.appendChild(row);
+    archiveSearch(q, 18).then((items) => {
+      if (!items.length) { row.remove(); return; }
+      const sc = row.querySelector(".row-scroll");
+      items.forEach((it) => sc.appendChild(odCard(it)));
+    }).catch(() => row.remove());
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+async function archiveSearch(q, rows) {
+  const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(q + " AND mediatype:(movies)")}&fl[]=identifier&fl[]=title&sort[]=downloads+desc&rows=${rows}&output=json`;
+  const r = await fetch(url);
+  const j = await r.json();
+  return ((j.response && j.response.docs) || []).map((d) => ({ id: d.identifier, title: d.title }));
+}
+function odCard(it) {
+  const card = el("div", "card");
+  const thumb = `https://archive.org/services/img/${encodeURIComponent(it.id)}`;
+  card.innerHTML = `<div class="card-thumb"><img loading="lazy" src="${thumb}" alt=""></div><div class="card-body"><div class="card-title">${esc(it.title || it.id)}</div><div class="card-meta">🏛️ Internet Archive</div></div>`;
+  card.querySelector("img").onerror = function () { this.parentNode.innerHTML = '<div class="fallback">🎬</div>'; };
+  card.onclick = () => openArchive(it);
+  return card;
+}
+async function openArchive(it) {
+  toast("Loading film…");
+  try {
+    const r = await fetch(`https://archive.org/metadata/${encodeURIComponent(it.id)}`);
+    const j = await r.json();
+    const files = (j.files || []).filter((f) => /\.(mp4|m4v|ogv|webm)$/i.test(f.name));
+    if (!files.length) { toast("No playable file for this title"); return; }
+    files.sort((a, b) => (a.name.toLowerCase().endsWith(".mp4") ? -1 : 1) - (b.name.toLowerCase().endsWith(".mp4") ? -1 : 1));
+    const url = `https://archive.org/download/${encodeURIComponent(it.id)}/${encodeURIComponent(files[0].name)}`;
+    openPlayerNow({ id: "ia:" + it.id, name: it.title || it.id, logo: `https://archive.org/services/img/${it.id}`, urls: [url], categories: [], country: "", countryName: "Internet Archive", flag: "🏛️", network: "Internet Archive (public domain)", owners: [], city: "", launched: "", website: `https://archive.org/details/${it.id}`, altNames: [], nsfw: false, experimental: false });
+  } catch (e) { toast("Couldn't load this title"); }
+}
+
+/* ============================================================
+ * Command palette (⌘/Ctrl+K) — the command layer
+ * ============================================================ */
+const CMDS = [
+  { icon: "🏠", label: "Home", run: () => navTo("home") },
+  { icon: "🗂️", label: "Categories", run: () => navTo("categories") },
+  { icon: "🌍", label: "Countries", run: () => navTo("countries") },
+  { icon: "🔲", label: "Multi-view", run: () => navTo("multiview") },
+  { icon: "🎬", label: "On Demand", run: () => navTo("ondemand") },
+  { icon: "⭐", label: "Favorites", run: () => navTo("favorites") },
+  { icon: "🎲", label: "Surprise me", run: () => { closeCmd(); if (state.channels.length) openPlayer(state.channels[Math.floor(Math.random() * state.channels.length)]); } },
+  { icon: "🔞", label: "Toggle 18+ channels", run: () => { closeCmd(); requestAdult(); } },
+];
+function openCmd() { $("#cmdOverlay").hidden = false; $("#cmdInput").value = ""; renderCmd(""); setTimeout(() => $("#cmdInput").focus(), 40); }
+function closeCmd() { $("#cmdOverlay").hidden = true; }
+function renderCmd(q) {
+  q = q.trim().toLowerCase();
+  const res = $("#cmdResults"); res.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  CMDS.filter((c) => !q || c.label.toLowerCase().includes(q)).forEach((c) => {
+    const row = el("div", "picker-row");
+    row.innerHTML = `<div class="picker-logo">${c.icon}</div><div class="picker-meta"><b>${esc(c.label)}</b><span>Action</span></div><span class="picker-add">↵</span>`;
+    row.onclick = c.run; frag.appendChild(row);
+  });
+  if (q) {
+    state.channels.filter((c) => c.name.toLowerCase().includes(q) || (c.network || "").toLowerCase().includes(q)).slice(0, 40).forEach((c) => {
+      const row = el("div", "picker-row");
+      const initials = c.name.replace(/[^A-Za-z0-9 ]/g, "").trim().slice(0, 2).toUpperCase() || "TV";
+      row.innerHTML = `<div class="picker-logo">${c.logo ? `<img src="${esc(c.logo)}" alt="" onerror="this.replaceWith(document.createTextNode('${esc(initials)}'))">` : esc(initials)}</div><div class="picker-meta"><b>${esc(c.name)}</b><span>${c.flag ? c.flag + " " : ""}${esc(c.countryName || "")}</span></div><span class="picker-add">▶</span>`;
+      row.onclick = () => { closeCmd(); openPlayer(c); };
+      frag.appendChild(row);
+    });
+  }
+  res.appendChild(frag);
+}
+
+/* View Transition wrapper for continuity (progressive enhancement) */
+function go(fn) {
+  if (document.startViewTransition && !reduceMotion) document.startViewTransition(() => fn());
+  else fn();
 }
 
 /* ============================================================
  * Navigation / wiring
  * ============================================================ */
+function navTo(v) {
+  $("#searchInput").value = ""; $("#searchClear").hidden = true; closeSidebar(); closeCmd();
+  go(() => {
+    if (v === "home") renderHome();
+    else if (v === "categories") { setActiveNav("categories"); renderBrowse("categories"); }
+    else if (v === "countries") { setActiveNav("countries"); renderBrowse("countries"); }
+    else if (v === "multiview") renderMultiview();
+    else if (v === "ondemand") renderOnDemand();
+    else if (v === "favorites") renderFavorites();
+  });
+}
+
 function setActiveNav(view) {
   document.querySelectorAll(".nav-item").forEach((b) =>
     b.classList.toggle("active", b.dataset.view === view));
@@ -824,27 +1088,29 @@ function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
 
 function wire() {
   document.querySelectorAll(".nav-item").forEach((btn) => {
-    btn.onclick = () => {
-      const v = btn.dataset.view;
-      $("#searchInput").value = "";
-      $("#searchClear").hidden = true;
-      closeSidebar();
-      if (v === "home") renderHome();
-      else if (v === "categories") { setActiveNav("categories"); renderBrowse("categories"); }
-      else if (v === "countries") { setActiveNav("countries"); renderBrowse("countries"); }
-      else if (v === "multiview") renderMultiview();
-      else if (v === "favorites") renderFavorites();
-    };
+    btn.onclick = () => navTo(btn.dataset.view);
   });
-
   document.querySelectorAll("[data-view-link]").forEach((b) => {
-    b.onclick = () => { setActiveNav("categories"); renderBrowse("categories"); };
+    b.onclick = () => navTo(b.dataset.viewLink || "categories");
   });
 
   $("#heroSurprise").onclick = () => {
     if (!state.channels.length) return;
     openPlayer(state.channels[Math.floor(Math.random() * state.channels.length)]);
   };
+  $("#heroWatch").onclick = () => { if (heroFeatured) openPlayer(heroFeatured); };
+
+  // Command palette (⌘/Ctrl + K)
+  document.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#cmdOverlay").hidden ? openCmd() : closeCmd(); }
+  });
+  $("#cmdClose").onclick = closeCmd;
+  $("#cmdOverlay").onclick = (e) => { if (e.target.id === "cmdOverlay") closeCmd(); };
+  const cmdIn = $("#cmdInput");
+  cmdIn.oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => renderCmd(cmdIn.value), 120); };
+
+  // Holo tilt (desktop, motion-safe)
+  if (canHover && !reduceMotion) document.addEventListener("pointermove", onTiltMove, { passive: true });
 
   const input = $("#searchInput");
   input.oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => onSearch(input.value), 220); };
@@ -875,7 +1141,8 @@ function wire() {
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    if (!$("#pickerOverlay").hidden) closePicker();
+    if (!$("#cmdOverlay").hidden) closeCmd();
+    else if (!$("#pickerOverlay").hidden) closePicker();
     else if (!$("#playerDesc").hidden) $("#playerDesc").hidden = true;
     else if (!$("#playerOverlay").hidden) closePlayer();
   });
