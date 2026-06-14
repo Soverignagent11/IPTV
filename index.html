@@ -6,183 +6,164 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#050713" />
-  <meta name="description" content="Nova TV is a safe, static, public live-TV browser powered by legal public channel metadata." />
-  <title>Nova TV — Kinetic Optics Live TV</title>
+  <meta name="theme-color" content="#040611" />
+  <meta name="description" content="Nova TV Signalverse is a safe, static, public live-TV signal browser powered by public channel metadata." />
+  <title>Nova TV — Signalverse</title>
   <link rel="preconnect" href="https://iptv-org.github.io" />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='30' fill='%23050713'/%3E%3Ccircle cx='60' cy='60' r='40' fill='%238ee8ff' fill-opacity='.22'/%3E%3Cpath d='M42 38h36a10 10 0 0 1 10 10v25a10 10 0 0 1-10 10H42a10 10 0 0 1-10-10V48a10 10 0 0 1 10-10Z' fill='none' stroke='%23fff' stroke-width='6'/%3E%3Cpath d='M53 53l20 10-20 10V53Z' fill='%23fff'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="assets/css/style.css?v=20" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='30' fill='%23040611'/%3E%3Ccircle cx='60' cy='60' r='42' fill='%238ee8ff' fill-opacity='.17'/%3E%3Ccircle cx='60' cy='60' r='7' fill='%23fff'/%3E%3Cpath d='M60 22v17M60 81v17M22 60h17M81 60h17M33 33l12 12M75 75l12 12M87 33 75 45M45 75 33 87' stroke='%23fff' stroke-width='6' stroke-linecap='round' opacity='.9'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="assets/css/style.css?v=30" />
 </head>
 <body>
-  <canvas id="lightField" aria-hidden="true"></canvas>
+  <canvas id="starfield" aria-hidden="true"></canvas>
 
-  <button class="menu-toggle optic-control" id="menuToggle" aria-label="Open navigation">☰</button>
+  <button class="mobile-menu" id="menuToggle" type="button" aria-label="Open navigation">☰</button>
 
-  <aside class="rail kinetic-surface" id="sidebar" aria-label="Primary navigation">
-    <div class="brand" data-optic>
-      <span class="brand-mark" aria-hidden="true"><span></span></span>
-      <span class="brand-copy"><b>Nova</b><strong>TV</strong><small>Kinetic Optics Edition</small></span>
-    </div>
+  <aside class="nav-rail material" id="sidebar" aria-label="Nova TV navigation">
+    <a class="brand" href="#signalverse" aria-label="Nova TV home">
+      <span class="brand-orb" aria-hidden="true"></span>
+      <span><b>Nova</b><strong>TV</strong><small>Signalverse</small></span>
+    </a>
 
-    <nav class="nav" aria-label="Views">
-      <button class="nav-item active" data-view="home"><span>⌂</span><b>Home</b></button>
-      <button class="nav-item" data-view="discover"><span>⌕</span><b>Discover</b></button>
-      <button class="nav-item" data-view="categories"><span>◇</span><b>Categories</b></button>
-      <button class="nav-item" data-view="countries"><span>◎</span><b>Countries</b></button>
-      <button class="nav-item" data-view="multiview"><span>▦</span><b>Signal Wall</b></button>
-      <button class="nav-item" data-view="favorites"><span>★</span><b>Favorites</b></button>
-      <a class="nav-item" href="lab.html"><span>✦</span><b>Optics Lab</b></a>
+    <nav class="nav-list" aria-label="Views">
+      <button class="nav-item active" type="button" data-view="signalverse"><span>✦</span>Signalverse</button>
+      <button class="nav-item" type="button" data-view="discover"><span>⌕</span>Discover</button>
+      <button class="nav-item" type="button" data-view="categories"><span>◇</span>Categories</button>
+      <button class="nav-item" type="button" data-view="countries"><span>◎</span>Countries</button>
+      <button class="nav-item" type="button" data-view="wall"><span>▦</span>Signal Wall</button>
+      <button class="nav-item" type="button" data-view="favorites"><span>★</span>Favorites</button>
+      <a class="nav-item" href="lab.html"><span>⚗</span>Optics Lab</a>
     </nav>
 
-    <section class="rail-section">
-      <div class="rail-title">Fast filters</div>
-      <div class="chip-list" id="quickCategories"></div>
+    <section class="rail-block">
+      <p class="rail-label">Signal filters</p>
+      <div class="quick-filters" id="quickFilters"></div>
     </section>
 
-    <section class="safety-card" aria-label="Safety and source policy">
-      <span class="safety-orb" aria-hidden="true"></span>
-      <div>
-        <b>Safe public mode</b>
-        <p>Adult/NSFW channels stay filtered. Streams are public listings; Nova does not host or own them.</p>
-      </div>
+    <section class="source-note">
+      <i></i>
+      <div><b>Safe public mode</b><p>Adult/NSFW listings stay filtered. Nova does not host streams or bypass regional rights.</p></div>
     </section>
 
-    <footer class="rail-foot">
-      <b>Build 20</b>
-      <span>Static · no accounts · local favorites</span>
-    </footer>
+    <footer class="rail-foot"><b>Build 30</b><span>No backend · local favorites · public metadata</span></footer>
   </aside>
 
-  <main class="app-shell" id="appShell">
-    <header class="topbar kinetic-surface" data-optic>
-      <div class="search-surface" data-optic>
+  <main class="app" id="app">
+    <header class="command-bar material" id="commandBar">
+      <label class="search-box" for="searchInput">
         <span aria-hidden="true">⌕</span>
-        <input id="searchInput" type="search" placeholder="Search channels, countries, categories…" autocomplete="off" />
-        <button class="icon-button" id="searchClear" aria-label="Clear search" hidden>×</button>
-      </div>
-      <button class="command-button optic-control" id="cmdBtn" type="button">Command <kbd>⌘K</kbd></button>
-      <button class="command-button optic-control" id="surpriseBtn" type="button">Surprise</button>
-      <div class="topbar-meta" id="topbarMeta">Loading…</div>
+        <input id="searchInput" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Scan channels, countries, categories…" />
+        <button class="clear-search" id="searchClear" type="button" aria-label="Clear search" hidden>×</button>
+      </label>
+      <button class="pill-btn" id="cmdBtn" type="button">Scanner <kbd>⌘K</kbd></button>
+      <button class="pill-btn" id="randomBtn" type="button">Random signal</button>
+      <span class="meta" id="topbarMeta">Loading public signals…</span>
     </header>
 
-    <section class="content" id="content">
-      <section class="hero kinetic-card" id="hero" data-optic>
-        <video class="hero-video" id="heroVideo" muted playsinline></video>
-        <div class="hero-context-fog"></div>
-        <div class="hero-copy">
-          <span class="eyebrow"><i></i> Public live signal</span>
-          <h1 id="heroTitle">Live TV, reshaped as optical matter.</h1>
-          <p id="heroDesc">Browse public live channels through a safer, static, privacy-first interface with adaptive surfaces, pressure feedback, light propagation, and legible glass.</p>
-          <div class="hero-actions">
-            <button class="btn primary" id="heroWatch" type="button">Watch featured</button>
-            <button class="btn ghost" id="heroSurprise" type="button">Find something live</button>
-          </div>
+    <section class="signalverse" id="signalverse" aria-label="Live signal universe">
+      <div class="signal-copy">
+        <span class="eyebrow"><i></i> Live public signal field</span>
+        <h1>Don’t browse channels. <span>Scan signals.</span></h1>
+        <p>Nova now opens as a living broadcast field. Pull a signal into focus, preview it, favorite it, or expand it into the player.</p>
+        <div class="signal-actions">
+          <button class="primary-action" id="scanStrong" type="button">Scan strong signals</button>
+          <button class="secondary-action" id="scanFar" type="button">Jump far away</button>
         </div>
-        <div class="hero-stats" id="heroStats"></div>
-      </section>
+      </div>
 
-      <section class="signal-strip" aria-label="Current library status">
-        <div class="signal-pill"><b id="safeCount">—</b><span>safe channels</span></div>
-        <div class="signal-pill"><b id="countryCount">—</b><span>countries</span></div>
-        <div class="signal-pill"><b id="categoryCount">—</b><span>categories</span></div>
-        <div class="signal-pill"><b>0</b><span>trackers</span></div>
-      </section>
+      <div class="signal-stage material" id="signalStage">
+        <div class="orbit-ring ring-one"></div>
+        <div class="orbit-ring ring-two"></div>
+        <div class="orbit-ring ring-three"></div>
+        <div class="signal-core" id="signalCore"><span>Nova</span><b>Signalverse</b></div>
+        <div class="signal-field" id="signalField"></div>
+      </div>
 
-      <section class="section-head" id="viewHead" hidden>
-        <div>
-          <span class="eyebrow"><i></i> Browse</span>
-          <h2 id="gridTitle">Discover</h2>
+      <article class="signal-preview material" id="signalPreview" hidden>
+        <button class="close-preview" id="previewClose" type="button" aria-label="Close preview">×</button>
+        <div class="preview-logo" id="previewLogo"></div>
+        <span class="eyebrow mini"><i></i> Signal locked</span>
+        <h2 id="previewTitle">—</h2>
+        <p id="previewMeta">—</p>
+        <div class="signal-health"><span id="healthLabel">Signal unknown</span><b id="healthBar"></b></div>
+        <div class="preview-actions">
+          <button class="primary-action" id="previewWatch" type="button">Enter signal</button>
+          <button class="secondary-action" id="previewFav" type="button">Favorite</button>
+          <button class="secondary-action" id="previewNext" type="button">Nearby</button>
         </div>
-        <span class="count" id="gridCount"></span>
-      </section>
-
-      <div id="rows"></div>
-      <div class="channel-grid" id="grid"></div>
-
-      <section class="multiview" id="multiview" hidden>
-        <div class="section-head inline">
-          <div>
-            <span class="eyebrow"><i></i> Signal Wall</span>
-            <h2>Watch multiple public streams</h2>
-          </div>
-          <div class="segmented" aria-label="Signal wall layout">
-            <button class="seg-btn" data-cols="1">1×</button>
-            <button class="seg-btn active" data-cols="2">2×</button>
-            <button class="seg-btn" data-cols="3">3×</button>
-          </div>
-        </div>
-        <p class="helper">Tiles start muted. Use only streams you are legally allowed to view in your region.</p>
-        <div class="mv-grid" id="mvGrid"></div>
-      </section>
-
-      <section class="state kinetic-surface" id="loading">
-        <div class="spinner"></div>
-        <p>Loading public channel index…</p>
-      </section>
-      <section class="state kinetic-surface" id="empty" hidden>
-        <h3>No matching channels</h3>
-        <p>Try a different search, category, or country.</p>
-      </section>
-      <section class="state kinetic-surface error" id="loadError" hidden>
-        <h3>Couldn’t reach the public channel database</h3>
-        <p>Check your connection and reload.</p>
-      </section>
+      </article>
     </section>
+
+    <section class="metrics" aria-label="Library metrics">
+      <div class="metric-card"><b id="safeCount">—</b><span>safe public signals</span></div>
+      <div class="metric-card"><b id="countryCount">—</b><span>countries</span></div>
+      <div class="metric-card"><b id="categoryCount">—</b><span>categories</span></div>
+      <div class="metric-card"><b>0</b><span>trackers/accounts</span></div>
+    </section>
+
+    <section class="view-head" id="viewHead" hidden>
+      <div><span class="eyebrow mini"><i></i> Browse layer</span><h2 id="viewTitle">Discover</h2></div>
+      <span class="view-count" id="viewCount"></span>
+    </section>
+
+    <section class="rows" id="rows"></section>
+    <section class="grid" id="grid"></section>
+
+    <section class="wall" id="wall" hidden>
+      <div class="view-head inline">
+        <div><span class="eyebrow mini"><i></i> Signal Wall</span><h2>Multi-stream wall</h2></div>
+        <div class="segmented" aria-label="Signal wall layout">
+          <button type="button" class="seg-btn" data-cols="1">1×</button>
+          <button type="button" class="seg-btn active" data-cols="2">2×</button>
+          <button type="button" class="seg-btn" data-cols="3">3×</button>
+        </div>
+      </div>
+      <p class="helper">Tiles start muted. Use only public streams you are legally allowed to view.</p>
+      <div class="wall-grid" id="wallGrid"></div>
+    </section>
+
+    <section class="state material" id="loading"><div class="spinner"></div><p>Scanning public signal index…</p></section>
+    <section class="state material" id="empty" hidden><h3>No signals found</h3><p>Try a different search, country, or category.</p></section>
+    <section class="state material error" id="loadError" hidden><h3>Signal index unavailable</h3><p>Check your connection and reload.</p></section>
   </main>
 
-  <section class="player-overlay" id="playerOverlay" hidden aria-modal="true" role="dialog" aria-label="Video player">
-    <div class="player-card kinetic-surface" data-optic>
+  <section class="player-overlay" id="playerOverlay" hidden role="dialog" aria-modal="true" aria-label="Nova TV player">
+    <div class="player-shell material">
       <div class="player-video-wrap">
         <video id="video" controls autoplay playsinline></video>
         <div class="player-loading" id="playerLoading"><div class="spinner"></div></div>
-        <div class="player-fail" id="playerFail" hidden>
-          <h3>Stream unavailable</h3>
-          <p>This public stream may be offline, region-restricted, or unsupported by your browser. Try another channel or another source.</p>
-          <button class="btn ghost" id="playerRetry" type="button">Try next source</button>
-        </div>
+        <div class="player-fail" id="playerFail" hidden><h3>Signal unavailable</h3><p>This public stream may be offline, region-restricted, or unsupported by your browser. Try another source or another channel.</p><button class="secondary-action" id="playerRetry" type="button">Try next source</button></div>
       </div>
       <div class="player-info">
-        <img class="player-logo" id="playerLogo" alt="" />
-        <div class="player-titles">
-          <h3 id="playerTitle">—</h3>
-          <p id="playerSub">—</p>
-        </div>
-        <button class="src-btn" id="playerSource" type="button" hidden>Source 1</button>
-        <button class="icon-button" id="playerInfo" type="button" aria-label="Channel details">ⓘ</button>
-        <button class="icon-button" id="playerPip" type="button" aria-label="Picture in picture">⧉</button>
-        <button class="icon-button" id="playerFav" type="button" aria-label="Favorite channel">★</button>
-        <button class="icon-button close" id="playerClose" type="button" aria-label="Close player">×</button>
+        <div class="player-logo" id="playerLogo"></div>
+        <div class="player-title-wrap"><h3 id="playerTitle">—</h3><p id="playerSub">—</p></div>
+        <button class="icon-btn" id="playerSource" type="button" hidden>Source</button>
+        <button class="icon-btn" id="playerDetailsBtn" type="button" aria-label="Channel details">ⓘ</button>
+        <button class="icon-btn" id="playerPip" type="button" aria-label="Picture in picture">⧉</button>
+        <button class="icon-btn" id="playerFav" type="button" aria-label="Favorite">★</button>
+        <button class="icon-btn close" id="playerClose" type="button" aria-label="Close player">×</button>
       </div>
       <div class="player-details" id="playerDetails" hidden></div>
     </div>
   </section>
 
-  <section class="picker-overlay" id="pickerOverlay" hidden aria-modal="true" role="dialog" aria-label="Add channel">
-    <div class="picker-card kinetic-surface" data-optic>
-      <div class="picker-head">
-        <span>⌕</span>
-        <input id="pickerInput" type="search" placeholder="Add a public channel to Signal Wall…" autocomplete="off" />
-        <button class="icon-button close" id="pickerClose" type="button" aria-label="Close picker">×</button>
-      </div>
-      <div class="picker-results" id="pickerResults"></div>
+  <section class="overlay" id="commandOverlay" hidden role="dialog" aria-modal="true" aria-label="Signal scanner">
+    <div class="scanner material">
+      <label class="scanner-input" for="commandInput"><span>⌘</span><input id="commandInput" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Scan: sports, Canada, news, random…" /><button class="icon-btn close" id="cmdClose" type="button" aria-label="Close scanner">×</button></label>
+      <div class="scanner-results" id="commandResults"></div>
     </div>
   </section>
 
-  <section class="picker-overlay" id="cmdOverlay" hidden aria-modal="true" role="dialog" aria-label="Command palette">
-    <div class="picker-card command-palette kinetic-surface" data-optic>
-      <div class="picker-head">
-        <span>⌘</span>
-        <input id="cmdInput" type="search" placeholder="Jump to channels, views, countries, categories…" autocomplete="off" />
-        <button class="icon-button close" id="cmdClose" type="button" aria-label="Close command palette">×</button>
-      </div>
-      <div class="picker-results" id="cmdResults"></div>
+  <section class="overlay" id="wallPickerOverlay" hidden role="dialog" aria-modal="true" aria-label="Add signal to wall">
+    <div class="scanner material">
+      <label class="scanner-input" for="wallPickerInput"><span>＋</span><input id="wallPickerInput" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Add signal to wall…" /><button class="icon-btn close" id="wallPickerClose" type="button" aria-label="Close picker">×</button></label>
+      <div class="scanner-results" id="wallPickerResults"></div>
     </div>
   </section>
 
   <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
-  <script src="assets/js/app.js?v=20"></script>
+  <script src="assets/js/app.js?v=30"></script>
 </body>
 </html>
