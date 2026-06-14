@@ -1,36 +1,23 @@
 /* ============================================================
- * Nova TV — Global nav state guard
- * Keeps dynamically added tabs from staying visually selected.
+ * Nova TV — Navigation compatibility shim
+ * The consolidated navigation model now lives in coherence.js.
+ * This file only exposes a tiny compatibility API for older modules.
  * ============================================================ */
 
 (() => {
-  const EXTRA_VIEWS = ["#guideView", "#apiSourcesView", "#radioView"];
+  const EXTRA_VIEWS = ["#guideView", "#apiSourcesView", "#radioView", "#firewallView", "#toolsView"];
 
-  document.addEventListener("click", (event) => {
-    const navItem = event.target.closest?.(".nav-item");
-    if (!navItem) return;
-
+  function activate(selector) {
     document.querySelectorAll(".nav-item").forEach((item) => item.classList.remove("active"));
-    navItem.classList.add("active");
+    document.querySelector(selector)?.classList.add("active");
+  }
 
-    if (navItem.dataset.view) {
-      EXTRA_VIEWS.forEach((selector) => {
-        const view = document.querySelector(selector);
-        if (view) view.hidden = true;
-      });
-    }
-  }, true);
+  function hideExtraViews() {
+    EXTRA_VIEWS.forEach((selector) => {
+      const view = document.querySelector(selector);
+      if (view) view.hidden = true;
+    });
+  }
 
-  window.NovaNav = {
-    activate(selector) {
-      document.querySelectorAll(".nav-item").forEach((item) => item.classList.remove("active"));
-      document.querySelector(selector)?.classList.add("active");
-    },
-    hideExtraViews() {
-      EXTRA_VIEWS.forEach((selector) => {
-        const view = document.querySelector(selector);
-        if (view) view.hidden = true;
-      });
-    },
-  };
+  window.NovaNav = { activate, hideExtraViews };
 })();
