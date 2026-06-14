@@ -14,6 +14,9 @@ const state = {
   catName: new Map(),
   view: "home",
   favorites: new Set(JSON.parse(localStorage.getItem("nova:favs") || "[]")),
+  recent: JSON.parse(localStorage.getItem("nova:recent") || "[]"),
+  multi: [],          // channel ids currently on the multi-view wall
+  multiCols: 2,       // grid columns for multi-view
 };
 
 /* ---------- tiny DOM helpers ---------- */
@@ -79,6 +82,14 @@ async function loadData() {
           country: c.country || "",
           countryName: country ? country.name : c.country || "",
           flag: country ? country.flag : "",
+          // Extra metadata for the channel info guide.
+          network: c.network || "",
+          owners: c.owners || [],
+          city: c.city || "",
+          launched: c.launched || "",
+          closed: c.closed || "",
+          website: c.website || "",
+          altNames: c.alt_names || [],
         };
       });
 
@@ -137,11 +148,17 @@ function renderQuickCategories() {
 /* ----- Home: a few curated rows ----- */
 function renderHome() {
   setActiveNav("home");
+  teardownMultiview();
   $("#hero").hidden = false;
   $("#gridHead").hidden = true;
   $("#grid").innerHTML = "";
   const rows = $("#rows");
   rows.innerHTML = "";
+
+  if (state.recent.length) {
+    const rec = state.recent.map((id) => state.byId.get(id)).filter(Boolean);
+    if (rec.length) rows.appendChild(buildRow("🕘 Recently watched", rec.slice(0, 20)));
+  }
 
   if (state.favorites.size) {
     const favs = [...state.favorites].map((id) => state.byId.get(id)).filter(Boolean);
@@ -214,6 +231,7 @@ function buildCard(c) {
 
 /* ----- Grid views ----- */
 function renderGrid(title, channels) {
+  teardownMultiview();
   $("#hero").hidden = true;
   $("#rows").innerHTML = "";
   $("#gridHead").hidden = false;
@@ -244,6 +262,7 @@ function showCountry(code) {
 
 /* ----- Browse menus (categories / countries lists as chips grid) ----- */
 function renderBrowse(kind) {
+  teardownMultiview();
   $("#hero").hidden = true;
   $("#rows").innerHTML = "";
   $("#grid").innerHTML = "";
@@ -322,8 +341,10 @@ function onSearch(q) {
 let hls = null;
 const video = $("#video");
 let current = { urls: [], idx: 0 };  // active channel's sources + which one we're on
+let currentChannel = null;
 
 function openPlayer(c) {
+  currentChannel = c;
   $("#playerOverlay").hidden = false;
   document.body.style.overflow = "hidden";
   $("#playerTitle").textContent = c.name;
@@ -331,14 +352,67 @@ function openPlayer(c) {
     c.categories.map((x) => state.catName.get(x) || x).slice(0, 3).join(", ") || "Live TV"}`;
   $("#playerLogo").src = c.logo || "";
   $("#playerLogo").style.visibility = c.logo ? "visible" : "hidden";
+  $("#playerDesc").hidden = true;
 
   const favBtn = $("#playerFav");
   favBtn.classList.toggle("on", state.favorites.has(c.id));
-  favBtn.onclick = () => { toggleFav(c.id); favBtn.classList.toggle("on"); };
+  favBtn.onclick = () => {
+    toggleFav(c.id); favBtn.classList.toggle("on");
+    toast(state.favorites.has(c.id) ? "★ Added to favorites" : "Removed from favorites");
+  };
 
+  pushRecent(c.id);
   current = { urls: c.urls.slice(), idx: 0 };
   updateSourceBtn();
   playCurrent();
+}
+
+/* ----- Recently watched ----- */
+function pushRecent(id) {
+  state.recent = [id, ...state.recent.filter((x) => x !== id)].slice(0, 20);
+  localStorage.setItem("nova:recent", JSON.stringify(state.recent));
+}
+
+/* ----- Channel info guide ----- */
+function channelDescription(c) {
+  const cats = c.categories.map((x) => state.catName.get(x) || x);
+  const place = [c.city, c.countryName].filter(Boolean).join(", ");
+  const lead = `${c.name} is a ${cats[0] ? cats[0].toLowerCase() + " " : ""}channel${
+    place ? ` based in ${place}` : ""}${c.network ? `, operated by ${c.network}` : ""}.`;
+  const rows = [
+    ["Country", `${c.flag ? c.flag + " " : ""}${c.countryName || "—"}`],
+    c.city && ["City", c.city],
+    cats.length && ["Categories", cats.join(", ")],
+    c.network && ["Network", c.network],
+    c.owners.length && ["Owner", c.owners.join(", ")],
+    c.launched && ["Launched", c.launched.slice(0, 4)],
+    c.altNames.length && ["Also known as", c.altNames.slice(0, 4).join(", ")],
+    ["Streams", `${c.urls.length} source${c.urls.length > 1 ? "s" : ""} available`],
+  ].filter(Boolean);
+  return `<p class="desc-lead">${esc(lead)}</p>` +
+    `<dl class="desc-list">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
+    (c.website ? `<a class="desc-link" href="${esc(c.website)}" target="_blank" rel="noopener">Visit official website ↗</a>` : "");
+}
+
+function toggleInfo() {
+  const panel = $("#playerDesc");
+  if (!currentChannel) return;
+  if (panel.hidden) {
+    $("#descTitle").textContent = currentChannel.name;
+    $("#descBody").innerHTML = channelDescription(currentChannel);
+    panel.hidden = false;
+  } else {
+    panel.hidden = true;
+  }
+}
+
+/* ----- Picture-in-picture ----- */
+async function togglePip() {
+  try {
+    if (document.pictureInPictureElement) await document.exitPictureInPicture();
+    else if (document.pictureInPictureEnabled) await video.requestPictureInPicture();
+    else toast("Picture-in-picture isn't supported on this browser");
+  } catch { toast("Couldn't start picture-in-picture"); }
 }
 
 function playCurrent() {
@@ -427,6 +501,156 @@ function toggleFav(id) {
 }
 
 /* ============================================================
+ * Multi-view (watch several channels at once)
+ * ============================================================ */
+const mvHls = new Map();   // tile index -> Hls instance
+
+function renderMultiview() {
+  setActiveNav("multiview");
+  $("#hero").hidden = true;
+  $("#rows").innerHTML = "";
+  $("#gridHead").hidden = true;
+  $("#grid").innerHTML = "";
+  hide("#empty");
+  $("#multiview").hidden = false;
+  $("#mvGrid").style.setProperty("--mv-cols", state.multiCols);
+  document.querySelectorAll(".mv-layout").forEach((b) =>
+    b.classList.toggle("on", +b.dataset.cols === state.multiCols));
+  drawMvTiles();
+}
+
+function drawMvTiles() {
+  const grid = $("#mvGrid");
+  // Tear down existing players before redrawing.
+  mvHls.forEach((h) => h.destroy());
+  mvHls.clear();
+  grid.innerHTML = "";
+
+  state.multi.forEach((id, i) => {
+    const c = state.byId.get(id);
+    if (!c) return;
+    const tile = el("div", "mv-tile");
+    tile.innerHTML = `
+      <video playsinline muted autoplay></video>
+      <div class="mv-load"><div class="spinner"></div></div>
+      <div class="mv-bar">
+        <span class="mv-name">${esc(c.name)}</span>
+        <button class="mv-btn mv-mute" title="Unmute">🔇</button>
+        <button class="mv-btn mv-max" title="Open fullscreen">⛶</button>
+        <button class="mv-btn mv-rm" title="Remove">✕</button>
+      </div>`;
+    grid.appendChild(tile);
+
+    const v = tile.querySelector("video");
+    mvPlay(v, c.urls, i, tile);
+
+    tile.querySelector(".mv-mute").onclick = (e) => {
+      const btn = e.currentTarget;
+      // Solo audio: unmuting one tile mutes the others.
+      grid.querySelectorAll("video").forEach((other) => { if (other !== v) other.muted = true; });
+      grid.querySelectorAll(".mv-mute").forEach((b) => { if (b !== btn) { b.textContent = "🔇"; b.title = "Unmute"; } });
+      v.muted = !v.muted;
+      btn.textContent = v.muted ? "🔇" : "🔊";
+      btn.title = v.muted ? "Unmute" : "Mute";
+    };
+    tile.querySelector(".mv-max").onclick = () => openPlayer(c);
+    tile.querySelector(".mv-rm").onclick = () => {
+      state.multi = state.multi.filter((x) => x !== id);
+      drawMvTiles();
+    };
+  });
+
+  if (state.multi.length < 9) {
+    const add = el("div", "mv-tile mv-add");
+    add.innerHTML = `<div class="mv-add-inner"><span>＋</span><b>Add channel</b></div>`;
+    add.onclick = () => openPicker((c) => {
+      if (!state.multi.includes(c.id)) state.multi.push(c.id);
+      drawMvTiles();
+    });
+    grid.appendChild(add);
+  }
+}
+
+function mvPlay(v, urls, i, tile) {
+  let idx = 0;
+  const load = tile.querySelector(".mv-load");
+  const start = () => {
+    if (mvHls.has(i)) { mvHls.get(i).destroy(); mvHls.delete(i); }
+    const ok = () => { load.style.display = "none"; v.play().catch(() => {}); };
+    const bad = () => {
+      if (idx < urls.length - 1) { idx++; start(); }
+      else { load.innerHTML = '<span class="mv-off">Offline</span>'; }
+    };
+    if (window.Hls && Hls.isSupported()) {
+      const h = new Hls({ manifestLoadingTimeOut: 9000, manifestLoadingMaxRetry: 1 });
+      mvHls.set(i, h);
+      h.loadSource(urls[idx]); h.attachMedia(v);
+      h.on(Hls.Events.MANIFEST_PARSED, ok);
+      h.on(Hls.Events.ERROR, (_e, d) => { if (d.fatal) bad(); });
+    } else if (v.canPlayType("application/vnd.apple.mpegurl")) {
+      v.src = urls[idx];
+      v.addEventListener("loadedmetadata", ok, { once: true });
+      v.addEventListener("error", bad, { once: true });
+    } else { bad(); }
+  };
+  start();
+}
+
+function teardownMultiview() {
+  mvHls.forEach((h) => h.destroy());
+  mvHls.clear();
+  $("#multiview").hidden = true;
+}
+
+/* ============================================================
+ * Channel picker
+ * ============================================================ */
+let pickerPick = null;
+function openPicker(onPick) {
+  pickerPick = onPick;
+  $("#pickerOverlay").hidden = false;
+  $("#pickerInput").value = "";
+  renderPicker("");
+  setTimeout(() => $("#pickerInput").focus(), 50);
+}
+function closePicker() { $("#pickerOverlay").hidden = true; pickerPick = null; }
+
+function renderPicker(q) {
+  q = q.trim().toLowerCase();
+  const list = (q
+    ? state.channels.filter((c) => c.name.toLowerCase().includes(q) || c.countryName.toLowerCase().includes(q))
+    : state.channels
+  ).slice(0, 80);
+  const wrap = $("#pickerResults");
+  wrap.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  list.forEach((c) => {
+    const row = el("div", "picker-row");
+    const initials = c.name.replace(/[^A-Za-z0-9 ]/g, "").trim().slice(0, 2).toUpperCase() || "TV";
+    row.innerHTML = `
+      <div class="picker-logo">${c.logo ? `<img src="${esc(c.logo)}" alt="" loading="lazy" onerror="this.replaceWith(document.createTextNode('${esc(initials)}'))">` : esc(initials)}</div>
+      <div class="picker-meta"><b>${esc(c.name)}</b><span>${c.flag ? c.flag + " " : ""}${esc(c.countryName || "")}</span></div>
+      <span class="picker-add">＋</span>`;
+    row.onclick = () => { if (pickerPick) pickerPick(c); closePicker(); toast(`Added ${c.name} to the wall`); };
+    frag.appendChild(row);
+  });
+  wrap.appendChild(frag);
+}
+
+/* ============================================================
+ * Toast
+ * ============================================================ */
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.hidden = false;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.classList.remove("show"); setTimeout(() => (t.hidden = true), 250); }, 2200);
+}
+
+/* ============================================================
  * Navigation / wiring
  * ============================================================ */
 function setActiveNav(view) {
@@ -448,6 +672,7 @@ function wire() {
       if (v === "home") renderHome();
       else if (v === "categories") { setActiveNav("categories"); renderBrowse("categories"); }
       else if (v === "countries") { setActiveNav("countries"); renderBrowse("countries"); }
+      else if (v === "multiview") renderMultiview();
       else if (v === "favorites") renderFavorites();
     };
   });
@@ -467,9 +692,33 @@ function wire() {
 
   $("#playerSource").onclick = () => nextSource(false);
   $("#playerRetry").onclick = () => { current.idx = 0; updateSourceBtn(); playCurrent(); };
+  $("#playerInfo").onclick = toggleInfo;
+  $("#playerPip").onclick = togglePip;
+  $("#descClose").onclick = () => ($("#playerDesc").hidden = true);
   $("#playerClose").onclick = closePlayer;
   $("#playerOverlay").onclick = (e) => { if (e.target.id === "playerOverlay") closePlayer(); };
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#playerOverlay").hidden) closePlayer(); });
+
+  // Channel picker (multi-view)
+  $("#pickerClose").onclick = closePicker;
+  $("#pickerOverlay").onclick = (e) => { if (e.target.id === "pickerOverlay") closePicker(); };
+  const pIn = $("#pickerInput");
+  pIn.oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => renderPicker(pIn.value), 180); };
+
+  // Multi-view layout buttons
+  document.querySelectorAll(".mv-layout").forEach((b) => {
+    b.onclick = () => {
+      state.multiCols = +b.dataset.cols;
+      $("#mvGrid").style.setProperty("--mv-cols", state.multiCols);
+      document.querySelectorAll(".mv-layout").forEach((x) => x.classList.toggle("on", x === b));
+    };
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (!$("#pickerOverlay").hidden) closePicker();
+    else if (!$("#playerDesc").hidden) $("#playerDesc").hidden = true;
+    else if (!$("#playerOverlay").hidden) closePlayer();
+  });
 
   $("#menuToggle").onclick = () => $("#sidebar").classList.toggle("open");
 }
