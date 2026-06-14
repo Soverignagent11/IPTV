@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0f1a" />
+  <meta name="description" content="Free IPTV web player — browse and watch thousands of live TV channels from around the world." />
+  <title>Nova TV — Live IPTV Player</title>
+  <link rel="preconnect" href="https://iptv-org.github.io" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%236d5efc'/%3E%3Cpath d='M30 40h40v28H30z' fill='none' stroke='white' stroke-width='5'/%3E%3Cpath d='M44 28l6 12 6-12' fill='none' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <!-- ===================== Sidebar ===================== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="brand-logo">▶</span>
+      <span class="brand-name">Nova<span>TV</span></span>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item active" data-view="home"><span class="ico">🏠</span> Home</button>
+      <button class="nav-item" data-view="categories"><span class="ico">🗂️</span> Categories</button>
+      <button class="nav-item" data-view="countries"><span class="ico">🌍</span> Countries</button>
+      <button class="nav-item" data-view="favorites"><span class="ico">⭐</span> Favorites</button>
+    </nav>
+
+    <div class="nav-section">
+      <div class="nav-section-title">Quick categories</div>
+      <div class="chip-list" id="quickCategories"></div>
+    </div>
+
+    <div class="sidebar-foot">
+      <p>Data by <a href="https://github.com/iptv-org/iptv" target="_blank" rel="noopener">iptv-org</a></p>
+    </div>
+  </aside>
+
+  <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">☰</button>
+
+  <!-- ===================== Main ===================== -->
+  <main class="main">
+    <header class="topbar">
+      <div class="search">
+        <span class="search-ico">🔎</span>
+        <input id="searchInput" type="search" placeholder="Search channels, countries, categories…" autocomplete="off" />
+        <button class="search-clear" id="searchClear" aria-label="Clear" hidden>✕</button>
+      </div>
+      <div class="topbar-meta" id="topbarMeta"></div>
+    </header>
+
+    <section class="content" id="content">
+      <!-- Hero -->
+      <div class="hero" id="hero">
+        <div class="hero-text">
+          <h1>Watch the world, live.</h1>
+          <p>Thousands of free, publicly available TV channels — news, sports, movies, music and more. Pick a channel to start streaming instantly.</p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" id="heroSurprise">🎲 Surprise me</button>
+            <button class="btn btn-ghost" data-view-link="categories">Browse categories</button>
+          </div>
+        </div>
+        <div class="hero-stats" id="heroStats"></div>
+      </div>
+
+      <div id="rows"></div>
+
+      <!-- Grid view (search / category / country results) -->
+      <div class="grid-head" id="gridHead" hidden>
+        <h2 id="gridTitle"></h2>
+        <span class="count" id="gridCount"></span>
+      </div>
+      <div class="channel-grid" id="grid"></div>
+
+      <div class="state" id="loading" hidden>
+        <div class="spinner"></div>
+        <p>Loading channels…</p>
+      </div>
+      <div class="state" id="empty" hidden>
+        <p>No channels found. Try another search.</p>
+      </div>
+      <div class="state error" id="loadError" hidden>
+        <p>Couldn't reach the channel database. Check your connection and reload.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================== Player ===================== -->
+  <div class="player-overlay" id="playerOverlay" hidden>
+    <div class="player-card">
+      <div class="player-video-wrap">
+        <video id="video" controls autoplay playsinline></video>
+        <div class="player-loading" id="playerLoading"><div class="spinner"></div></div>
+        <div class="player-fail" id="playerFail" hidden>
+          <p>⚠️ This stream couldn't be played.</p>
+          <small>Many public streams are geo-blocked or offline. Try another channel.</small>
+        </div>
+      </div>
+      <div class="player-info">
+        <img class="player-logo" id="playerLogo" alt="" />
+        <div class="player-titles">
+          <h3 id="playerTitle">—</h3>
+          <p id="playerSub">—</p>
+        </div>
+        <button class="icon-btn" id="playerFav" title="Add to favorites">⭐</button>
+        <button class="icon-btn close" id="playerClose" title="Close">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
