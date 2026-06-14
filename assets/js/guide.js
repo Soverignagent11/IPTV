@@ -52,14 +52,14 @@
       <div class="view-head inline">
         <div>
           <span class="eyebrow mini"><i></i> Channel Guide</span>
-          <h2>What’s live</h2>
+          <h2>Channel Guide</h2>
         </div>
         <span class="view-count" id="guideCount"></span>
       </div>
 
       <div class="guide-toolbar">
         <div class="guide-filter-bar" id="guideFilters"></div>
-        <p class="guide-note">This guide shows live channels in a familiar TV-guide layout. Exact program titles depend on external EPG availability, so Nova labels public streams honestly instead of fabricating schedules.</p>
+        <p class="guide-note">Browse channels in a familiar TV-guide layout. Nova shows real guide metadata only when a legal external source is available; otherwise it clearly marks schedule data as pending.</p>
       </div>
 
       <div class="guide-shell">
@@ -103,7 +103,7 @@
   }
 
   function hideMainViews() {
-    ["#signalverse", "#viewHead", "#wall", "#empty"].forEach((sel) => {
+    ["#signalverse", "#viewHead", "#wall", "#empty", "#apiSourcesView"].forEach((sel) => {
       const node = q(sel);
       if (node) node.hidden = true;
     });
@@ -118,7 +118,7 @@
     if (!grid) return;
 
     const channels = getGuideChannels();
-    q("#guideCount").textContent = `${channels.length.toLocaleString()} guide rows`;
+    q("#guideCount").textContent = `${channels.length.toLocaleString()} channels`;
     grid.innerHTML = "";
 
     if (!channels.length) {
@@ -203,10 +203,10 @@
     const country = channel.countryName || channel.country || "Public stream";
     const sourceText = `${channel.urls.length} source${channel.urls.length === 1 ? "" : "s"} · ${healthLabel(channel.health)}`;
     return [
-      { title: `${category} live feed`, sub: country, label: "Live now" },
-      { title: `Continue watching ${shortName(channel.name)}`, sub: sourceText, label: plusMinutes(30) },
-      { title: "Program data pending", sub: "External EPG not attached for this public listing", label: plusMinutes(60) },
-      { title: "Continuous public stream", sub: "Open channel for current broadcast", label: plusMinutes(90) },
+      { title: "On now", sub: `${category} · ${country}`, label: "Live" },
+      { title: "Up next", sub: "Schedule metadata pending", label: plusMinutes(30) },
+      { title: "Later", sub: "External EPG/API data not attached for this channel", label: plusMinutes(60) },
+      { title: "Continuous stream", sub: sourceText, label: plusMinutes(90) },
     ];
   }
 
@@ -221,11 +221,6 @@
 
   function initials(name) {
     return String(name || "TV").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join("").toUpperCase() || "TV";
-  }
-
-  function shortName(name) {
-    const clean = String(name || "channel").replace(/\s+TV$/i, "").trim();
-    return clean.length > 26 ? `${clean.slice(0, 24)}…` : clean;
   }
 
   function primaryCategory(channel) {
