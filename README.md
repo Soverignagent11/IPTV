@@ -1,64 +1,95 @@
-# 📺 Nova TV — Free IPTV Web Player
+# 📺 Nova TV — Kinetic Optics Live TV
 
-A clean, self-contained TV app you can host for free on **GitHub Pages**. It browses
-thousands of public live‑TV channels and plays them right in the browser — no backend,
-no build step, no tracking.
+Nova TV is a self-contained, static public live-TV browser designed for **GitHub Pages**.
+It uses public channel and stream metadata from the open-source **[iptv-org](https://github.com/iptv-org/iptv)** project and plays compatible HLS streams in the browser with **[hls.js](https://github.com/video-dev/hls.js)**.
 
-Channel and stream data come from the open‑source **[iptv‑org](https://github.com/iptv-org/iptv)**
-project's public API. Video plays via [hls.js](https://github.com/video-dev/hls.js).
+This version redesigns the app around a new visual language called **Kinetic Optics**: selective optical responsiveness, adaptive glass, pressure-like controls, safe focus halos, context fog, and legibility-first motion.
 
-![No backend](https://img.shields.io/badge/backend-none-blue) ![Static](https://img.shields.io/badge/100%25-static-success) ![License MIT](https://img.shields.io/badge/license-MIT-green)
+![Static](https://img.shields.io/badge/100%25-static-success) ![No backend](https://img.shields.io/badge/backend-none-blue) ![License MIT](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
-## ✨ Features
+## ✨ What changed in Build 20
 
-- **Browse** by Home rows, Categories, or Countries
-- **Search** across channel names, countries, and categories
-- **Favorites** saved locally in your browser (no account)
-- **"Surprise me"** to jump into a random channel
-- **Responsive** — works on desktop, tablet, and phone
-- **Safe by default** — adult/NSFW channels are filtered out
+- **Top-to-bottom Kinetic Optics redesign**
+  - adaptive edge-lensing surfaces
+  - prismatic rim highlights
+  - context fog for readability
+  - pressure-style button feedback
+  - contact-light propagation on interaction
+  - magnetic, high-visibility focus rings
+  - reduced-motion and reduced-transparency fallbacks
 
-## 🔒 Privacy & safety
+- **Safer public mode**
+  - adult/NSFW channels are filtered out by default and no adult toggle is exposed
+  - only HTTPS public stream URLs are used
+  - the app does not host, own, scrape, or redistribute streams
+  - no analytics, cookies, accounts, or backend tracking
 
-- No analytics, cookies, or telemetry. Favorites live only in your browser's `localStorage`.
-- Only two external resources are loaded: the iptv‑org JSON data and the hls.js library (from jsDelivr CDN).
-- Streams are **video content**, not code — they can't run anything on your device.
-- Streams are publicly listed by iptv‑org; some may be offline or geo‑restricted in your region.
+- **Rebuilt browsing experience**
+  - Home with featured public live channel rows
+  - Discover view
+  - category index
+  - country index
+  - local favorites
+  - recent channels
+  - command palette with `Cmd/Ctrl + K`
+  - Signal Wall multi-view for multiple muted streams
+
+---
+
+## 🔒 Privacy and content policy
+
+Nova TV is a static front-end. It does not run a backend and does not collect user data.
+
+Local browser storage is used only for:
+
+- favorites
+- recent channels
+- Signal Wall channel IDs
+
+Channel and stream availability depends on the public sources listed by iptv-org. Some streams may be offline, unsupported by a browser, or unavailable in a region. Nova TV does not bypass broadcaster restrictions and does not provide access to private, pirated, or adult content.
+
+---
 
 ## 🚀 Deploy to GitHub Pages
 
-This repo includes a workflow (`.github/workflows/deploy.yml`) that publishes the site automatically.
+This repo includes a workflow in `.github/workflows/` that can publish the static site automatically.
 
-1. Push this branch to GitHub (already done if you're reading this there).
-2. In the repo, go to **Settings → Pages**.
-3. Under **Build and deployment → Source**, choose **GitHub Actions**.
-4. The "Deploy Nova TV to GitHub Pages" workflow runs on every push and gives you a live URL like:
-   `https://<your-username>.github.io/<repo>/`
+1. Go to **Settings → Pages**.
+2. Under **Build and deployment → Source**, choose **GitHub Actions**.
+3. Push to `main`.
+4. Open the published GitHub Pages URL.
 
-That's it — open the URL and start watching.
+---
 
-### Run locally
+## Run locally
 
-It's just static files, so any static server works:
+Use any static server:
 
 ```bash
-# Python
 python3 -m http.server 8080
-# then open http://localhost:8080
 ```
+
+Then open:
+
+```text
+http://localhost:8080
+```
+
+---
 
 ## 🗂️ Project structure
 
-```
-index.html            # markup + layout
-assets/css/style.css  # theme & responsive styles
-assets/js/app.js       # data loading, rendering, search, HLS player
+```text
+index.html            # markup and app shell
+assets/css/style.css  # Kinetic Optics visual language
+assets/js/app.js      # data loading, rendering, search, player, Signal Wall
 .github/workflows/    # GitHub Pages deployment
 ```
 
+---
+
 ## 📄 License
 
-MIT. Channel data is provided by iptv‑org under its own terms. This project does not host
-or own any of the streams.
+MIT. Channel data is provided by iptv-org under its own terms. This project does not host, own, or claim rights to any stream.
