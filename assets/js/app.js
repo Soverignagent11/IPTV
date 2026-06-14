@@ -1251,6 +1251,14 @@ function wire() {
 
   // Holo tilt (desktop, motion-safe)
   if (canHover && !reduceMotion) document.addEventListener("pointermove", onTiltMove, { passive: true });
+  // Pointer-tracked specular on glass controls (Optics Lab finding)
+  if (canHover) document.addEventListener("pointermove", (e) => {
+    const b = e.target.closest(".btn, .icon-btn, .src-btn, .cmd-btn");
+    if (!b) return;
+    const r = b.getBoundingClientRect();
+    b.style.setProperty("--mx", (((e.clientX - r.left) / r.width) * 100).toFixed(1) + "%");
+    b.style.setProperty("--my", (((e.clientY - r.top) / r.height) * 100).toFixed(1) + "%");
+  }, { passive: true });
 
   const input = $("#searchInput");
   input.oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => onSearch(input.value), 220); };
