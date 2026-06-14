@@ -45,22 +45,36 @@ async function loadData() {
     state.countries = countries;
     const countryMap = new Map(countries.map((c) => [c.code, c]));
 
-    // Map first working stream URL per channel id.
-    const streamFor = new Map();
+    // Collect ALL stream URLs per channel (for automatic failover), not just
+    // the first. When several sources exist and one is offline or geo-blocked,
+    // we can fall through to the next.
+    const onHttps = location.protocol === "https:";
+    const streamsForCh = new Map();
     for (const s of streams) {
-      if (s.channel && s.url && !streamFor.has(s.channel)) streamFor.set(s.channel, s.url);
+      if (!s.channel || !s.url) continue;
+      // On an https site, http streams are blocked as "mixed content" and can
+      // never play — drop them so the user only sees channels that actually work.
+      const secure = s.url.startsWith("https:");
+      if (onHttps && !secure) continue;
+      if (!streamsForCh.has(s.channel)) streamsForCh.set(s.channel, []);
+      const list = streamsForCh.get(s.channel);
+      if (!list.includes(s.url)) list.push(s.url);
+    }
+    // Prefer https sources first within each channel's list.
+    for (const list of streamsForCh.values()) {
+      list.sort((a, b) => (b.startsWith("https:") ? 1 : 0) - (a.startsWith("https:") ? 1 : 0));
     }
 
     // Keep only channels we can actually play, and that aren't NSFW.
     state.channels = channels
-      .filter((c) => streamFor.has(c.id) && !c.is_nsfw && !(c.categories || []).includes("xxx"))
+      .filter((c) => streamsForCh.has(c.id) && !c.is_nsfw && !(c.categories || []).includes("xxx"))
       .map((c) => {
         const country = countryMap.get(c.country);
         return {
           id: c.id,
           name: c.name,
           logo: c.logo || "",
-          url: streamFor.get(c.id),
+          urls: streamsForCh.get(c.id),
           categories: c.categories || [],
           country: c.country || "",
           countryName: country ? country.name : c.country || "",
@@ -307,6 +321,7 @@ function onSearch(q) {
  * ============================================================ */
 let hls = null;
 const video = $("#video");
+let current = { urls: [], idx: 0 };  // active channel's sources + which one we're on
 
 function openPlayer(c) {
   $("#playerOverlay").hidden = false;
@@ -316,31 +331,74 @@ function openPlayer(c) {
     c.categories.map((x) => state.catName.get(x) || x).slice(0, 3).join(", ") || "Live TV"}`;
   $("#playerLogo").src = c.logo || "";
   $("#playerLogo").style.visibility = c.logo ? "visible" : "hidden";
-  $("#playerFail").hidden = true;
-  $("#playerLoading").style.display = "grid";
 
   const favBtn = $("#playerFav");
   favBtn.classList.toggle("on", state.favorites.has(c.id));
   favBtn.onclick = () => { toggleFav(c.id); favBtn.classList.toggle("on"); };
 
-  playStream(c.url);
+  current = { urls: c.urls.slice(), idx: 0 };
+  updateSourceBtn();
+  playCurrent();
+}
+
+function playCurrent() {
+  $("#playerFail").hidden = true;
+  $("#playerLoading").style.display = "grid";
+  playStream(current.urls[current.idx]);
+}
+
+// Move to the next source. `auto` = triggered by a failure (silent),
+// otherwise it's a manual user tap that wraps around the list.
+function nextSource(auto) {
+  if (auto) {
+    if (current.idx >= current.urls.length - 1) return false;
+    current.idx++;
+  } else {
+    current.idx = (current.idx + 1) % current.urls.length;
+  }
+  updateSourceBtn();
+  playCurrent();
+  return true;
+}
+
+function updateSourceBtn() {
+  const btn = $("#playerSource");
+  if (current.urls.length > 1) {
+    btn.hidden = false;
+    btn.textContent = `⤵ Source ${current.idx + 1}/${current.urls.length}`;
+  } else {
+    btn.hidden = true;
+  }
+}
+
+// Mobile browsers block autoplay-with-sound; retry muted so the picture
+// still starts, and the user can unmute with the controls.
+function startPlayback() {
+  const p = video.play();
+  if (p && p.catch) p.catch(() => { video.muted = true; video.play().catch(() => {}); });
 }
 
 function playStream(url) {
   destroyHls();
-  const onReady = () => { $("#playerLoading").style.display = "none"; };
-  const onFail = () => { $("#playerLoading").style.display = "none"; $("#playerFail").hidden = false; };
+  let settled = false;
+  const onReady = () => { settled = true; $("#playerLoading").style.display = "none"; startPlayback(); };
+  const onFail = () => {
+    if (settled) return;
+    settled = true;
+    // Try the next source automatically; only show the error if none are left.
+    if (!nextSource(true)) { $("#playerLoading").style.display = "none"; $("#playerFail").hidden = false; }
+  };
 
   if (window.Hls && Hls.isSupported()) {
-    hls = new Hls({ maxBufferLength: 20, manifestLoadingTimeOut: 12000 });
+    hls = new Hls({ maxBufferLength: 20, manifestLoadingTimeOut: 9000, manifestLoadingMaxRetry: 1 });
     hls.loadSource(url);
     hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, () => { onReady(); video.play().catch(() => {}); });
+    hls.on(Hls.Events.MANIFEST_PARSED, onReady);
     hls.on(Hls.Events.ERROR, (_e, data) => { if (data.fatal) onFail(); });
   } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    // Safari / iOS native HLS
+    // Safari / iOS native HLS (also dodges many CORS issues hls.js hits).
     video.src = url;
-    video.addEventListener("loadedmetadata", () => { onReady(); video.play().catch(() => {}); }, { once: true });
+    video.addEventListener("loadedmetadata", onReady, { once: true });
     video.addEventListener("error", onFail, { once: true });
   } else {
     onFail();
@@ -407,6 +465,8 @@ function wire() {
   input.oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => onSearch(input.value), 220); };
   $("#searchClear").onclick = () => { input.value = ""; onSearch(""); input.focus(); };
 
+  $("#playerSource").onclick = () => nextSource(false);
+  $("#playerRetry").onclick = () => { current.idx = 0; updateSourceBtn(); playCurrent(); };
   $("#playerClose").onclick = closePlayer;
   $("#playerOverlay").onclick = (e) => { if (e.target.id === "playerOverlay") closePlayer(); };
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#playerOverlay").hidden) closePlayer(); });

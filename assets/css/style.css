@@ -253,6 +253,12 @@ a:hover { text-decoration: underline; }
 .icon-btn:hover { background: var(--bg-card-hover); }
 .icon-btn.on { color: #ffce4d; border-color: #ffce4d; }
 .icon-btn.close:hover { border-color: var(--danger); color: var(--danger); }
+.src-btn {
+  height: 42px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--bg-card); color: var(--text); font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: 0.15s; white-space: nowrap; flex: 0 0 auto;
+}
+.src-btn:hover { background: var(--bg-card-hover); border-color: var(--accent); }
 
 /* ===================== Mobile ===================== */
 .menu-toggle {

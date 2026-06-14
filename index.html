@@ -93,7 +93,8 @@
         <div class="player-loading" id="playerLoading"><div class="spinner"></div></div>
         <div class="player-fail" id="playerFail" hidden>
           <p>⚠️ This stream couldn't be played.</p>
-          <small>Many public streams are geo-blocked or offline. Try another channel.</small>
+          <small>All sources for this channel are offline or region‑blocked in your location.<br/>Region blocks are set by the broadcaster — a VPN is the only way around them. Otherwise, try another channel.</small>
+          <button class="btn btn-ghost" id="playerRetry" style="margin-top:14px;justify-self:center">↻ Try again</button>
         </div>
       </div>
       <div class="player-info">
@@ -102,6 +103,7 @@
           <h3 id="playerTitle">—</h3>
           <p id="playerSub">—</p>
         </div>
+        <button class="src-btn" id="playerSource" title="Try a different stream source" hidden>⤵ Source</button>
         <button class="icon-btn" id="playerFav" title="Add to favorites">⭐</button>
         <button class="icon-btn close" id="playerClose" title="Close">✕</button>
       </div>
