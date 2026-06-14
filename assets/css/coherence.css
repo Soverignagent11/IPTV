@@ -1,24 +1,31 @@
 /* ============================================================
  * Nova TV — Product Coherence Layer
- * Final polish pass: navigation, labels, spacing, and feature consistency.
+ * Final polish pass: navigation, labels, grouping, and feature consistency.
  * ============================================================ */
 
 :root {
   --nav-safe-bottom: max(10px, env(safe-area-inset-bottom));
 }
 
+.nav-secondary {
+  display: none !important;
+}
+
 /* Keep feature pages from feeling like separate apps. */
 .guide-view,
 .radio-view,
 .firewall-view,
-.api-view {
+.api-view,
+.tools-view {
   margin-top: 4px;
 }
 
 .guide-toolbar,
 .api-toolbar,
 .radio-hero,
-.firewall-panel {
+.firewall-panel,
+.tools-grid,
+.browse-switch {
   max-width: 1320px;
 }
 
@@ -58,8 +65,130 @@
 #guideView[hidden],
 #radioView[hidden],
 #firewallView[hidden],
-#apiSourcesView[hidden] {
+#apiSourcesView[hidden],
+#toolsView[hidden],
+#browseSwitch[hidden] {
   display: none !important;
+}
+
+/* Browse becomes the parent for channel discovery, Categories, and Countries. */
+.browse-switch {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin: 0 0 16px;
+  padding: 10px;
+  border-radius: 999px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: var(--mat);
+  backdrop-filter: blur(var(--blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(150%);
+  box-shadow: var(--soft), inset 0 1px 0 rgba(255,255,255,.14);
+  scrollbar-width: none;
+}
+
+.browse-switch::-webkit-scrollbar { display: none; }
+
+.browse-chip {
+  appearance: none;
+  flex: 0 0 auto;
+  min-height: 40px;
+  border-radius: 999px;
+  padding: 0 15px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.07);
+  color: var(--muted);
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.browse-chip:hover,
+.browse-chip.active {
+  color: var(--ink);
+  border-color: rgba(142,232,255,.42);
+  background: rgba(142,232,255,.14);
+}
+
+/* Tools becomes the parent for advanced/utility modules. */
+.tools-view {
+  animation: toolsFade .22s var(--ease) both;
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.tool-card {
+  appearance: none;
+  min-height: 190px;
+  border-radius: 30px;
+  padding: 20px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  background: var(--mat);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(var(--blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(150%);
+  box-shadow: var(--soft), inset 0 1px 0 rgba(255,255,255,.14);
+  position: relative;
+  overflow: hidden;
+  transition: transform .16s var(--spring), border-color .2s var(--ease), background .2s var(--ease);
+}
+
+.tool-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .75;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(142,232,255,.18), transparent 34%),
+    radial-gradient(circle at 90% 0%, rgba(182,156,255,.14), transparent 30%);
+}
+
+.tool-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(142,232,255,.46);
+  background: rgba(142,232,255,.08);
+}
+
+.tool-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.tool-card span {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  margin-bottom: 14px;
+  background: linear-gradient(135deg, rgba(142,232,255,.26), rgba(182,156,255,.24)), rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  font-size: 23px;
+}
+
+.tool-card b {
+  display: block;
+  font-size: 20px;
+  letter-spacing: -.04em;
+  margin-bottom: 8px;
+}
+
+.tool-card p {
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 13px;
+}
+
+@keyframes toolsFade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 
 /* Desktop nav tooltips using accessible labels. */
@@ -212,7 +341,8 @@
   .guide-view,
   .radio-view,
   .firewall-view,
-  .api-view {
+  .api-view,
+  .tools-view {
     padding-bottom: 4px;
   }
 
@@ -223,8 +353,18 @@
   .api-provider-card,
   .radio-card,
   .firewall-row,
-  .guide-row {
+  .guide-row,
+  .tool-card {
     box-shadow: var(--soft), inset 0 1px 0 rgba(255,255,255,.10);
+  }
+
+  .browse-switch {
+    border-radius: 24px;
+    padding: 8px;
+  }
+
+  .tools-grid {
+    grid-template-columns: 1fr;
   }
 }
 
