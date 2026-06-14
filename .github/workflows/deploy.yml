@@ -3,7 +3,6 @@ name: Deploy Nova TV to GitHub Pages
 on:
   push:
     branches:
-      - claude/tv-app-interface-design-3mr81b
       - main
   workflow_dispatch:
 
