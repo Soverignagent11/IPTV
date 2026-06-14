@@ -1,0 +1,367 @@
+/* ============================================================
+ * Nova TV — Channel Guide layer
+ * Apple TV / Prime-style channel guide with Kinetic Optics material.
+ * ============================================================ */
+
+.guide-view {
+  animation: guideFade .22s var(--ease) both;
+}
+
+.guide-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 18px;
+  flex-wrap: wrap;
+}
+
+.guide-filter-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 10px;
+  scroll-snap-type: x proximity;
+}
+
+.guide-filter {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.07);
+  color: var(--muted);
+  border-radius: 999px;
+  min-height: 40px;
+  padding: 0 14px;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: transform .16s var(--spring), border-color .2s var(--ease), background .2s var(--ease), color .2s var(--ease);
+}
+
+.guide-filter:hover,
+.guide-filter.active {
+  color: var(--ink);
+  border-color: rgba(142,232,255,.48);
+  background: rgba(142,232,255,.14);
+}
+
+.guide-filter:active { transform: scale(.96); }
+
+.guide-note {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 640px;
+}
+
+.guide-shell {
+  position: relative;
+  border-radius: 34px;
+  overflow: hidden;
+  background: var(--mat);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(var(--blur)) saturate(150%) contrast(108%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(150%) contrast(108%);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.16);
+}
+
+.guide-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(142,232,255,.10), transparent 28%, transparent 70%, rgba(182,156,255,.08)),
+    linear-gradient(180deg, rgba(255,255,255,.07), transparent 12%);
+  opacity: .9;
+}
+
+.guide-grid {
+  position: relative;
+  z-index: 1;
+  overflow: auto;
+  max-height: min(74vh, 820px);
+  overscroll-behavior: contain;
+}
+
+.guide-timebar,
+.guide-row {
+  display: grid;
+  grid-template-columns: 260px repeat(4, minmax(190px, 1fr));
+  min-width: 1040px;
+}
+
+.guide-timebar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: rgba(5,8,18,.92);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+
+.guide-timebar > div {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  border-right: 1px solid rgba(255,255,255,.08);
+}
+
+.guide-timebar > div:first-child { color: var(--ink); }
+
+.guide-row {
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.guide-row:hover {
+  background: rgba(142,232,255,.045);
+}
+
+.guide-channel {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 92px;
+  padding: 13px 14px;
+  background: rgba(5,8,18,.86);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-right: 1px solid rgba(255,255,255,.10);
+}
+
+.guide-logo {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(142,232,255,.22), rgba(182,156,255,.20)), rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.guide-logo img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  padding: 7px;
+}
+
+.guide-logo .logo-fallback {
+  width: 100%;
+  height: 100%;
+  font-size: 16px;
+}
+
+.guide-channel-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.guide-channel-copy b {
+  display: block;
+  font-size: 14px;
+  letter-spacing: -.025em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.guide-channel-copy span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.guide-play {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.08);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.guide-play:hover {
+  border-color: rgba(142,232,255,.48);
+  background: rgba(142,232,255,.14);
+}
+
+.guide-slot {
+  position: relative;
+  min-height: 92px;
+  padding: 13px 14px;
+  border-right: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.035);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.guide-slot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(190px circle at var(--mx,50%) var(--my,50%), rgba(255,255,255,.20), transparent 50%);
+  transition: opacity .2s var(--ease);
+  pointer-events: none;
+}
+
+.guide-slot:hover::before,
+.guide-slot.now::before { opacity: 1; }
+
+.guide-slot.now {
+  background: linear-gradient(135deg, rgba(142,232,255,.16), rgba(182,156,255,.08)), rgba(255,255,255,.05);
+}
+
+.guide-slot b {
+  position: relative;
+  display: block;
+  font-size: 14px;
+  line-height: 1.22;
+  letter-spacing: -.02em;
+  z-index: 1;
+}
+
+.guide-slot span {
+  position: relative;
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  z-index: 1;
+}
+
+.guide-slot small {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--a);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+.guide-slot small::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #ff3246;
+  box-shadow: 0 0 12px #ff3246;
+}
+
+.guide-empty {
+  padding: 28px;
+  color: var(--muted);
+  text-align: center;
+}
+
+@keyframes guideFade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 700px) {
+  .nav-list { grid-template-columns: repeat(7, 1fr); }
+
+  .guide-toolbar {
+    display: grid;
+    gap: 10px;
+  }
+
+  .guide-note {
+    font-size: 12px;
+  }
+
+  .guide-shell {
+    border-radius: 26px;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .guide-shell::before,
+  .guide-timebar { display: none; }
+
+  .guide-grid {
+    max-height: none;
+    overflow: visible;
+    display: grid;
+    gap: 12px;
+  }
+
+  .guide-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    min-width: 0;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 24px;
+    overflow: hidden;
+    background: var(--mat);
+    backdrop-filter: blur(var(--blur)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--blur)) saturate(150%);
+    box-shadow: var(--soft), inset 0 1px 0 rgba(255,255,255,.12);
+  }
+
+  .guide-channel {
+    position: relative;
+    left: auto;
+    min-height: 74px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.055);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .guide-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+  }
+
+  .guide-play {
+    width: 42px;
+    height: 42px;
+  }
+
+  .guide-slot {
+    min-height: 78px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+
+  .guide-slot:last-child { border-bottom: 0; }
+
+  .guide-slot b { font-size: 13px; }
+  .guide-slot span { font-size: 11px; }
+}
