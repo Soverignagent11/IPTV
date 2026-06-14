@@ -1,62 +1,64 @@
 /* ============================================================
- * Nova TV — Kinetic Optics Edition
- * Static, public, safe-by-default live-TV browser.
+ * Nova TV — Signalverse V2
+ * Static, public, safe-by-default live-TV signal browser.
  * ============================================================ */
 
 const API = "https://iptv-org.github.io/api";
-const SAFE_STORAGE = {
-  favs: "nova:favorites:v20",
-  recent: "nova:recent:v20",
-  multiview: "nova:multiview:v20",
+const STORE = {
+  favs: "nova:signalverse:favorites:v30",
+  recent: "nova:signalverse:recent:v30",
+  wall: "nova:signalverse:wall:v30",
 };
 
 const state = {
-  allChannels: [],
-  channels: [],
+  all: [],
+  visible: [],
+  field: [],
   byId: new Map(),
   categories: [],
   countries: [],
   catName: new Map(),
-  countryName: new Map(),
-  favorites: new Set(readJSON(SAFE_STORAGE.favs, [])),
-  recent: readJSON(SAFE_STORAGE.recent, []),
-  multi: readJSON(SAFE_STORAGE.multiview, []),
-  multiCols: 2,
-  view: "home",
+  countryMap: new Map(),
+  favorites: new Set(readJSON(STORE.favs, [])),
+  recent: readJSON(STORE.recent, []),
+  wall: readJSON(STORE.wall, []),
+  wallCols: 2,
+  selected: null,
   current: null,
   sourceIndex: 0,
   hls: null,
-  mvPlayers: [],
+  wallPlayers: [],
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+
+function readJSON(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
+  catch { return fallback; }
+}
+function writeJSON(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
 function el(tag, cls, html) {
   const node = document.createElement(tag);
   if (cls) node.className = cls;
   if (html != null) node.innerHTML = html;
   return node;
 }
-function esc(value) {
-  return String(value ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
-function readJSON(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
-  catch { return fallback; }
-}
-function writeJSON(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
-function show(sel) { const n = typeof sel === "string" ? $(sel) : sel; if (n) n.hidden = false; }
-function hide(sel) { const n = typeof sel === "string" ? $(sel) : sel; if (n) n.hidden = true; }
-
-/* ============================================================
- * Boot
- * ============================================================ */
+function show(nodeOrSel) { const n = typeof nodeOrSel === "string" ? $(nodeOrSel) : nodeOrSel; if (n) n.hidden = false; }
+function hide(nodeOrSel) { const n = typeof nodeOrSel === "string" ? $(nodeOrSel) : nodeOrSel; if (n) n.hidden = true; }
 
 window.addEventListener("DOMContentLoaded", () => {
-  bindGlobalUI();
-  bootLightField();
+  bindUI();
+  bootStarfield();
   loadData();
 });
+
+/* ============================================================
+ * Data
+ * ============================================================ */
 
 async function loadData() {
   show("#loading");
@@ -70,61 +72,60 @@ async function loadData() {
       fetch(`${API}/countries.json`).then((r) => r.json()),
     ]);
 
-    state.categories = categories
-      .filter((c) => c && c.id !== "xxx")
-      .sort((a, b) => a.name.localeCompare(b.name));
-    state.countries = countries.sort((a, b) => a.name.localeCompare(b.name));
+    state.categories = categories.filter((c) => c?.id && c.id !== "xxx").sort((a, b) => a.name.localeCompare(b.name));
+    state.countries = countries.filter((c) => c?.code).sort((a, b) => a.name.localeCompare(b.name));
     state.catName = new Map(state.categories.map((c) => [c.id, c.name]));
-    state.countryName = new Map(state.countries.map((c) => [c.code, c]));
+    state.countryMap = new Map(state.countries.map((c) => [c.code, c]));
 
     const streamMap = new Map();
     for (const s of streams) {
-      if (!s.channel || !s.url) continue;
-      if (!s.url.startsWith("https:")) continue;
+      if (!s.channel || !s.url || !s.url.startsWith("https:")) continue;
       const list = streamMap.get(s.channel) || [];
       if (!list.includes(s.url)) list.push(s.url);
       streamMap.set(s.channel, list);
     }
 
-    const built = [];
-    for (const channel of channels) {
-      const urls = streamMap.get(channel.id) || [];
-      if (!urls.length) continue;
-      const categories = (channel.categories || []).filter((id) => id !== "xxx");
-      const nsfw = Boolean(channel.is_nsfw || (channel.categories || []).includes("xxx"));
+    const safe = [];
+    for (const c of channels) {
+      const urls = streamMap.get(c.id);
+      if (!urls?.length) continue;
+      const rawCats = c.categories || [];
+      const nsfw = Boolean(c.is_nsfw || rawCats.includes("xxx"));
       if (nsfw) continue;
-      const country = state.countryName.get(channel.country);
-      built.push({
-        id: channel.id,
-        name: channel.name || channel.id,
-        logo: channel.logo || "",
+      const cleanCats = rawCats.filter((id) => id !== "xxx" && state.catName.has(id));
+      const country = state.countryMap.get(c.country);
+      safe.push({
+        id: c.id,
+        name: c.name || c.id,
+        logo: c.logo || "",
         urls,
-        categories,
-        country: channel.country || "",
-        countryName: country ? country.name : channel.country || "",
-        flag: country ? country.flag : "",
-        network: channel.network || "",
-        owners: channel.owners || [],
-        city: channel.city || "",
-        launched: channel.launched || "",
-        closed: channel.closed || "",
-        website: channel.website || "",
-        altNames: channel.alt_names || [],
+        categories: cleanCats,
+        country: c.country || "",
+        countryName: country?.name || c.country || "",
+        flag: country?.flag || "",
+        network: c.network || "",
+        owners: c.owners || [],
+        city: c.city || "",
+        website: c.website || "",
+        launched: c.launched || "",
+        closed: c.closed || "",
+        altNames: c.alt_names || [],
+        health: estimateHealth(c, urls),
       });
     }
 
-    built.sort((a, b) => a.name.localeCompare(b.name));
-    state.allChannels = built;
-    state.channels = built;
-    state.byId = new Map(built.map((c) => [c.id, c]));
+    safe.sort((a, b) => a.name.localeCompare(b.name));
+    state.all = safe;
+    state.visible = safe;
+    state.byId = new Map(safe.map((c) => [c.id, c]));
     state.recent = state.recent.filter((id) => state.byId.has(id)).slice(0, 40);
-    state.multi = state.multi.filter((id) => state.byId.has(id)).slice(0, 9);
-    writeJSON(SAFE_STORAGE.recent, state.recent);
-    writeJSON(SAFE_STORAGE.multiview, state.multi);
+    state.wall = state.wall.filter((id) => state.byId.has(id)).slice(0, 9);
+    state.favorites = new Set([...state.favorites].filter((id) => state.byId.has(id)));
+    persistUserState();
 
     hide("#loading");
     renderChrome();
-    renderHome();
+    renderSignalverse();
   } catch (err) {
     console.error(err);
     hide("#loading");
@@ -132,309 +133,301 @@ async function loadData() {
   }
 }
 
-function renderChrome() {
-  const cats = new Set();
-  const countries = new Set();
-  for (const c of state.channels) {
-    c.categories.forEach((x) => cats.add(x));
-    if (c.country) countries.add(c.country);
-  }
-
-  $("#safeCount").textContent = state.channels.length.toLocaleString();
-  $("#countryCount").textContent = countries.size.toLocaleString();
-  $("#categoryCount").textContent = cats.size.toLocaleString();
-  $("#topbarMeta").textContent = `${state.channels.length.toLocaleString()} safe public channels`;
-
-  const heroStats = $("#heroStats");
-  heroStats.innerHTML = "";
-  [[state.channels.length, "Safe channels"], [countries.size, "Countries"], [cats.size, "Categories"]].forEach(([n, label]) => {
-    heroStats.appendChild(el("div", "stat", `<b>${Number(n).toLocaleString()}</b><span>${label}</span>`));
-  });
-
-  const quick = $("#quickCategories");
-  quick.innerHTML = "";
-  ["news", "sports", "movies", "music", "entertainment", "kids", "documentary"].forEach((id) => {
-    if (!state.catName.has(id)) return;
-    const chip = el("button", "chip", esc(state.catName.get(id)));
-    chip.type = "button";
-    chip.addEventListener("click", () => showCategory(id));
-    quick.appendChild(chip);
-  });
+function estimateHealth(channel, urls) {
+  let score = 52 + Math.min(urls.length, 5) * 8;
+  if (channel.logo) score += 8;
+  if ((channel.categories || []).length) score += 5;
+  if (channel.website) score += 4;
+  return Math.max(38, Math.min(96, score));
+}
+function persistUserState() {
+  writeJSON(STORE.favs, [...state.favorites]);
+  writeJSON(STORE.recent, state.recent);
+  writeJSON(STORE.wall, state.wall);
 }
 
 /* ============================================================
- * Navigation and views
+ * UI binding
  * ============================================================ */
 
-function bindGlobalUI() {
-  document.addEventListener("pointermove", updateOpticPointer, { passive: true });
-  document.addEventListener("click", createContactLight, true);
+function bindUI() {
+  document.addEventListener("pointermove", opticPointer, { passive: true });
+  document.addEventListener("click", contactLight, true);
+
+  ["searchInput", "commandInput", "wallPickerInput"].forEach((id) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener("touchend", () => input.focus({ preventScroll: true }), { passive: true });
+    input.addEventListener("click", () => input.focus({ preventScroll: true }));
+  });
 
   $("#menuToggle").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
   $$(".nav-item[data-view]").forEach((btn) => btn.addEventListener("click", () => route(btn.dataset.view)));
-  $("#searchInput").addEventListener("input", handleSearch);
-  $("#searchClear").addEventListener("click", clearSearch);
+
+  $("#searchInput").addEventListener("input", onSearchInput);
+  $("#searchClear").addEventListener("click", () => clearSearch(true));
   $("#cmdBtn").addEventListener("click", openCommand);
   $("#cmdClose").addEventListener("click", closeCommand);
-  $("#cmdInput").addEventListener("input", renderCommandResults);
-  $("#surpriseBtn").addEventListener("click", surprise);
-  $("#heroSurprise").addEventListener("click", surprise);
-  $("#heroWatch").addEventListener("click", () => state.current ? openPlayer(state.current) : surprise());
+  $("#commandInput").addEventListener("input", renderCommandResults);
+  $("#randomBtn").addEventListener("click", randomSignal);
+  $("#scanStrong").addEventListener("click", () => setField(sampleStrongSignals()));
+  $("#scanFar").addEventListener("click", jumpFarAway);
+
+  $("#previewClose").addEventListener("click", () => hide("#signalPreview"));
+  $("#previewWatch").addEventListener("click", () => state.selected && openPlayer(state.selected));
+  $("#previewFav").addEventListener("click", () => state.selected && toggleFavorite(state.selected.id, true));
+  $("#previewNext").addEventListener("click", nearbySignal);
 
   $("#playerClose").addEventListener("click", closePlayer);
   $("#playerRetry").addEventListener("click", nextSource);
   $("#playerSource").addEventListener("click", nextSource);
   $("#playerFav").addEventListener("click", () => state.current && toggleFavorite(state.current.id, true));
-  $("#playerInfo").addEventListener("click", togglePlayerDetails);
+  $("#playerDetailsBtn").addEventListener("click", toggleDetails);
   $("#playerPip").addEventListener("click", requestPip);
 
-  $("#pickerClose").addEventListener("click", closePicker);
-  $("#pickerInput").addEventListener("input", renderPickerResults);
-
-  $$(".seg-btn").forEach((btn) => btn.addEventListener("click", () => setMultiCols(Number(btn.dataset.cols))));
+  $$(".seg-btn").forEach((btn) => btn.addEventListener("click", () => setWallCols(Number(btn.dataset.cols))));
+  $("#wallPickerClose").addEventListener("click", closeWallPicker);
+  $("#wallPickerInput").addEventListener("input", renderWallPickerResults);
 
   document.addEventListener("keydown", (event) => {
     const key = event.key.toLowerCase();
     if ((event.metaKey || event.ctrlKey) && key === "k") { event.preventDefault(); openCommand(); }
-    if (event.key === "Escape") { closeCommand(); closePicker(); closePlayer(); $("#sidebar").classList.remove("open"); }
+    if (event.key === "Escape") { closeCommand(); closeWallPicker(); closePlayer(); hide("#signalPreview"); $("#sidebar").classList.remove("open"); }
   });
 }
 
 function route(view) {
-  clearSearch(false);
-  teardownMultiview();
-  hide("#empty");
   $("#sidebar").classList.remove("open");
-  if (view === "home") return renderHome();
-  if (view === "discover") return showGrid("Discover", smartShuffle(state.channels).slice(0, 180));
+  clearSearch(false);
+  hide("#signalPreview");
+  teardownWall();
+  if (view === "signalverse") return renderSignalverse();
+  if (view === "discover") return showGrid("Discover", smartShuffle(state.all).slice(0, 240), "discover");
   if (view === "categories") return showCategories();
   if (view === "countries") return showCountries();
   if (view === "favorites") return showFavorites();
-  if (view === "multiview") return showMultiview();
+  if (view === "wall") return showWall();
 }
-
-function setActiveNav(view) {
-  state.view = view;
+function setActive(view) {
   $$(".nav-item[data-view]").forEach((btn) => btn.classList.toggle("active", btn.dataset.view === view));
 }
-
-function clearMain() {
+function clearViews() {
+  hide("#viewHead");
+  hide("#wall");
+  hide("#empty");
   $("#rows").innerHTML = "";
   $("#grid").innerHTML = "";
-  $("#viewHead").hidden = true;
-  $("#multiview").hidden = true;
-}
-
-function renderHome() {
-  setActiveNav("home");
-  clearMain();
-  $("#hero").hidden = false;
-  const rows = $("#rows");
-  const featured = pickFeatured();
-  setHero(featured);
-
-  const spotlight = buildSpotlight();
-  if (spotlight) rows.appendChild(spotlight);
-
-  const recent = state.recent.map((id) => state.byId.get(id)).filter(Boolean);
-  if (recent.length) rows.appendChild(buildRow("Recently watched", recent.slice(0, 20)));
-
-  const favs = [...state.favorites].map((id) => state.byId.get(id)).filter(Boolean);
-  if (favs.length) rows.appendChild(buildRow("Favorites", favs.slice(0, 20), showFavorites));
-
-  const curated = [
-    ["News", "news"],
-    ["Sports", "sports"],
-    ["Movies", "movies"],
-    ["Music", "music"],
-    ["Entertainment", "entertainment"],
-    ["Kids", "kids"],
-    ["Documentary", "documentary"],
-  ];
-  for (const [title, cat] of curated) {
-    const list = state.channels.filter((c) => c.categories.includes(cat));
-    if (list.length) rows.appendChild(buildRow(title, smartShuffle(list).slice(0, 22), () => showCategory(cat)));
-  }
-}
-
-function showGrid(title, channels) {
-  setActiveNav(state.view === "home" ? "discover" : state.view);
-  clearMain();
-  $("#hero").hidden = true;
-  $("#viewHead").hidden = false;
-  $("#gridTitle").textContent = title;
-  $("#gridCount").textContent = `${channels.length.toLocaleString()} channels`;
-  const grid = $("#grid");
-  grid.innerHTML = "";
-  channels.forEach((c) => grid.appendChild(channelCard(c)));
-  $("#empty").hidden = channels.length !== 0;
-  enhanceOptics(grid);
-}
-
-function showCategory(id) {
-  state.view = "categories";
-  setActiveNav("categories");
-  const name = state.catName.get(id) || id;
-  showGrid(name, state.channels.filter((c) => c.categories.includes(id)));
-}
-
-function showCountry(code) {
-  state.view = "countries";
-  setActiveNav("countries");
-  const country = state.countryName.get(code);
-  showGrid(country ? `${country.flag || ""} ${country.name}`.trim() : code, state.channels.filter((c) => c.country === code));
-}
-
-function showFavorites() {
-  state.view = "favorites";
-  setActiveNav("favorites");
-  const list = [...state.favorites].map((id) => state.byId.get(id)).filter(Boolean);
-  showGrid("Favorites", list);
-}
-
-function showCategories() {
-  setActiveNav("categories");
-  clearMain();
-  $("#hero").hidden = true;
-  $("#viewHead").hidden = false;
-  $("#gridTitle").textContent = "Categories";
-  const counts = countBy((c) => c.categories);
-  $("#gridCount").textContent = `${counts.size.toLocaleString()} active categories`;
-  const grid = $("#grid");
-  grid.innerHTML = "";
-  [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .forEach(([id, count]) => grid.appendChild(indexCard(state.catName.get(id) || id, `${count.toLocaleString()} channels`, () => showCategory(id))));
-}
-
-function showCountries() {
-  setActiveNav("countries");
-  clearMain();
-  $("#hero").hidden = true;
-  $("#viewHead").hidden = false;
-  $("#gridTitle").textContent = "Countries";
-  const counts = countBy((c) => c.country ? [c.country] : []);
-  $("#gridCount").textContent = `${counts.size.toLocaleString()} active countries`;
-  const grid = $("#grid");
-  grid.innerHTML = "";
-  [...counts.entries()]
-    .sort((a, b) => (state.countryName.get(a[0])?.name || a[0]).localeCompare(state.countryName.get(b[0])?.name || b[0]))
-    .forEach(([code, count]) => {
-      const country = state.countryName.get(code);
-      grid.appendChild(indexCard(`${country?.flag || ""} ${country?.name || code}`.trim(), `${count.toLocaleString()} channels`, () => showCountry(code)));
-    });
 }
 
 /* ============================================================
- * Search, command, picker
+ * Chrome and Signalverse
  * ============================================================ */
 
-function handleSearch() {
+function renderChrome() {
+  const cats = new Set();
+  const countries = new Set();
+  for (const c of state.all) {
+    c.categories.forEach((x) => cats.add(x));
+    if (c.country) countries.add(c.country);
+  }
+  $("#safeCount").textContent = state.all.length.toLocaleString();
+  $("#countryCount").textContent = countries.size.toLocaleString();
+  $("#categoryCount").textContent = cats.size.toLocaleString();
+  $("#topbarMeta").textContent = `${state.all.length.toLocaleString()} safe public signals`;
+
+  const filters = $("#quickFilters");
+  filters.innerHTML = "";
+  ["news", "sports", "movies", "music", "entertainment", "kids", "documentary"].forEach((id) => {
+    if (!state.catName.has(id)) return;
+    const btn = el("button", "filter-chip", esc(state.catName.get(id)));
+    btn.type = "button";
+    btn.addEventListener("click", () => showCategory(id));
+    filters.appendChild(btn);
+  });
+}
+
+function renderSignalverse(list = null) {
+  setActive("signalverse");
+  clearViews();
+  show("#signalverse");
+  const source = list || buildHomeField();
+  setField(source);
+  renderHomeRows();
+}
+
+function buildHomeField() {
+  const wanted = ["news", "sports", "movies", "music", "entertainment", "documentary"];
+  const picks = [];
+  const used = new Set();
+  for (const cat of wanted) {
+    const pool = state.all.filter((c) => c.logo && c.categories.includes(cat) && !used.has(c.id));
+    smartShuffle(pool).slice(0, 8).forEach((c) => { picks.push(c); used.add(c.id); });
+  }
+  smartShuffle(state.all.filter((c) => c.logo && !used.has(c.id))).slice(0, 18).forEach((c) => picks.push(c));
+  return picks.slice(0, 56);
+}
+
+function setField(list) {
+  state.field = list.filter(Boolean).slice(0, 64);
+  const field = $("#signalField");
+  field.innerHTML = "";
+  const count = state.field.length || 1;
+  state.field.forEach((channel, index) => {
+    const node = signalNode(channel, index, count);
+    field.appendChild(node);
+  });
+  if (state.field[0]) previewSignal(state.field[0], false);
+}
+
+function signalNode(channel, index, count) {
+  const ring = index % 3;
+  const ringRadius = [24, 34, 43][ring];
+  const angle = (index / count) * Math.PI * 2 + ring * .48;
+  const wobble = Math.sin(index * 2.17) * 4;
+  const x = 50 + Math.cos(angle) * (ringRadius + wobble);
+  const y = 50 + Math.sin(angle) * (ringRadius + Math.cos(index) * 3);
+  const size = Math.max(42, Math.min(74, 44 + channel.health * .28 + (channel.logo ? 8 : 0)));
+  const hue = hueFor(channel);
+  const node = el("button", "signal-node", channel.logo ? `<img src="${esc(channel.logo)}" alt="" loading="lazy" />` : `<span class="letters">${initials(channel.name)}</span>`);
+  node.type = "button";
+  node.title = `${channel.name} — ${meta(channel)}`;
+  node.style.setProperty("--x", `${x}%`);
+  node.style.setProperty("--y", `${y}%`);
+  node.style.setProperty("--size", `${size}px`);
+  node.style.setProperty("--hue", String(hue));
+  node.style.setProperty("--delay", `${(index % 9) * .13}s`);
+  node.dataset.id = channel.id;
+  node.addEventListener("click", () => previewSignal(channel, true));
+  node.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") previewSignal(channel, true); });
+  return node;
+}
+
+function previewSignal(channel, userIntent = true) {
+  state.selected = channel;
+  $$(".signal-node").forEach((n) => n.classList.toggle("focused", n.dataset.id === channel.id));
+  const preview = $("#signalPreview");
+  $("#previewLogo").innerHTML = logoHTML(channel);
+  $("#previewTitle").textContent = channel.name;
+  $("#previewMeta").textContent = `${meta(channel)} · ${channel.urls.length} source${channel.urls.length === 1 ? "" : "s"}`;
+  $("#healthLabel").textContent = healthLabel(channel.health);
+  $("#healthBar").style.setProperty("--health", `${channel.health}%`);
+  $("#previewFav").textContent = state.favorites.has(channel.id) ? "Favorited" : "Favorite";
+  show(preview);
+  if (userIntent) pulseStage(channel);
+}
+
+function nearbySignal() {
+  if (!state.selected || !state.field.length) return;
+  const sameCategory = state.selected.categories[0];
+  const pool = state.field.filter((c) => c.id !== state.selected.id && (!sameCategory || c.categories.includes(sameCategory)));
+  const next = smartShuffle(pool.length ? pool : state.field.filter((c) => c.id !== state.selected.id))[0];
+  if (next) previewSignal(next, true);
+}
+function randomSignal() { const pick = smartShuffle(state.all)[0]; if (pick) previewSignal(pick, true); }
+function jumpFarAway() {
+  const usedCountries = new Set(state.field.map((c) => c.country));
+  const far = state.all.filter((c) => c.logo && c.country && !usedCountries.has(c.country));
+  setField(smartShuffle(far.length ? far : state.all).slice(0, 56));
+  toast("Jumped to a distant signal cluster.");
+}
+function sampleStrongSignals() {
+  return smartShuffle(state.all.filter((c) => c.logo && c.health >= 78)).slice(0, 56);
+}
+function pulseStage(channel) {
+  const stage = $("#signalStage");
+  stage.style.setProperty("--mx", `${28 + (hueFor(channel) % 44)}%`);
+  stage.style.setProperty("--my", `${28 + ((hueFor(channel) * 3) % 44)}%`);
+}
+function healthLabel(score) {
+  if (score >= 82) return "Strong signal";
+  if (score >= 66) return "Stable signal";
+  if (score >= 50) return "Unknown stability";
+  return "Weak signal";
+}
+
+function renderHomeRows() {
+  const rows = $("#rows");
+  rows.innerHTML = "";
+  const recent = state.recent.map((id) => state.byId.get(id)).filter(Boolean);
+  if (recent.length) rows.appendChild(buildRow("Recently entered", recent.slice(0, 20)));
+  const favs = [...state.favorites].map((id) => state.byId.get(id)).filter(Boolean);
+  if (favs.length) rows.appendChild(buildRow("Favorite signals", favs.slice(0, 20), showFavorites));
+  [["News", "news"], ["Sports", "sports"], ["Movies", "movies"], ["Music", "music"]].forEach(([title, cat]) => {
+    const list = smartShuffle(state.all.filter((c) => c.categories.includes(cat))).slice(0, 20);
+    if (list.length) rows.appendChild(buildRow(title, list, () => showCategory(cat)));
+  });
+}
+
+/* ============================================================
+ * Browse views
+ * ============================================================ */
+
+function onSearchInput() {
   const q = $("#searchInput").value.trim();
   $("#searchClear").hidden = !q;
-  if (!q) return state.view === "home" ? renderHome() : route(state.view);
-  setActiveNav("discover");
-  const list = searchChannels(q, state.channels).slice(0, 240);
-  showGrid(`Search: ${q}`, list);
+  if (!q) return renderSignalverse();
+  const results = searchChannels(q).slice(0, 240);
+  setActive("discover");
+  clearViews();
+  show("#signalverse");
+  setField(results.slice(0, 56));
+  showGrid(`Scan: ${q}`, results, "discover", false);
 }
 function clearSearch(rerender = true) {
   $("#searchInput").value = "";
   $("#searchClear").hidden = true;
-  if (rerender) renderHome();
+  if (rerender) renderSignalverse();
 }
-function searchChannels(query, source = state.channels) {
-  const q = query.toLowerCase();
-  return source.filter((c) => [
-    c.name,
-    c.countryName,
-    c.country,
-    c.network,
-    c.city,
-    ...c.altNames,
-    ...c.categories.map((id) => state.catName.get(id) || id),
-  ].join(" ").toLowerCase().includes(q));
+function showGrid(title, channels, active = "discover", hideSignal = true) {
+  setActive(active);
+  if (hideSignal) hide("#signalverse");
+  hide("#wall");
+  $("#rows").innerHTML = "";
+  show("#viewHead");
+  $("#viewTitle").textContent = title;
+  $("#viewCount").textContent = `${channels.length.toLocaleString()} signals`;
+  const grid = $("#grid");
+  grid.innerHTML = "";
+  channels.forEach((c) => grid.appendChild(channelCard(c)));
+  $("#empty").hidden = channels.length !== 0;
 }
-
-function openCommand() {
-  show("#cmdOverlay");
-  $("#cmdInput").value = "";
-  renderCommandResults();
-  setTimeout(() => $("#cmdInput").focus(), 30);
+function showCategory(id) { showGrid(state.catName.get(id) || id, state.all.filter((c) => c.categories.includes(id)), "categories"); }
+function showCategories() {
+  setActive("categories");
+  hide("#signalverse");
+  clearViews();
+  show("#viewHead");
+  $("#viewTitle").textContent = "Categories";
+  const counts = countBy((c) => c.categories);
+  $("#viewCount").textContent = `${counts.size.toLocaleString()} active categories`;
+  const grid = $("#grid");
+  [...counts.entries()].sort((a, b) => b[1] - a[1]).forEach(([id, count]) => grid.appendChild(indexCard(state.catName.get(id) || id, `${count.toLocaleString()} signals`, () => showCategory(id))));
 }
-function closeCommand() { hide("#cmdOverlay"); }
-function renderCommandResults() {
-  const q = $("#cmdInput").value.trim();
-  const results = $("#cmdResults");
-  results.innerHTML = "";
-  const actions = [
-    ["Home", "Return to featured rows", () => { closeCommand(); renderHome(); }],
-    ["Discover", "Browse a shuffled public channel wall", () => { closeCommand(); route("discover"); }],
-    ["Signal Wall", "Open multi-view", () => { closeCommand(); showMultiview(); }],
-    ["Favorites", "Open saved local favorites", () => { closeCommand(); showFavorites(); }],
-    ["Surprise", "Open a random live channel", () => { closeCommand(); surprise(); }],
-  ];
-  actions
-    .filter(([name, desc]) => !q || `${name} ${desc}`.toLowerCase().includes(q.toLowerCase()))
-    .forEach(([name, desc, fn]) => results.appendChild(commandRow(name, desc, fn)));
-
-  if (q) {
-    searchChannels(q, state.channels).slice(0, 8).forEach((c) => results.appendChild(pickerRow(c, () => { closeCommand(); openPlayer(c); })));
-  } else {
-    smartShuffle(state.channels).slice(0, 8).forEach((c) => results.appendChild(pickerRow(c, () => { closeCommand(); openPlayer(c); })));
-  }
+function showCountry(code) {
+  const country = state.countryMap.get(code);
+  showGrid(country ? `${country.flag || ""} ${country.name}`.trim() : code, state.all.filter((c) => c.country === code), "countries");
 }
-function commandRow(title, desc, fn) {
-  const row = el("button", "picker-row", `<span class="picker-logo">⌘</span><span class="picker-meta"><b>${esc(title)}</b><span>${esc(desc)}</span></span><span class="picker-add">›</span>`);
-  row.type = "button";
-  row.addEventListener("click", fn);
-  return row;
+function showCountries() {
+  setActive("countries");
+  hide("#signalverse");
+  clearViews();
+  show("#viewHead");
+  $("#viewTitle").textContent = "Countries";
+  const counts = countBy((c) => c.country ? [c.country] : []);
+  $("#viewCount").textContent = `${counts.size.toLocaleString()} active countries`;
+  const grid = $("#grid");
+  [...counts.entries()].sort((a, b) => (state.countryMap.get(a[0])?.name || a[0]).localeCompare(state.countryMap.get(b[0])?.name || b[0])).forEach(([code, count]) => {
+    const country = state.countryMap.get(code);
+    grid.appendChild(indexCard(`${country?.flag || ""} ${country?.name || code}`.trim(), `${count.toLocaleString()} signals`, () => showCountry(code)));
+  });
 }
-
-function openPicker() {
-  show("#pickerOverlay");
-  $("#pickerInput").value = "";
-  renderPickerResults();
-  setTimeout(() => $("#pickerInput").focus(), 30);
-}
-function closePicker() { hide("#pickerOverlay"); }
-function renderPickerResults() {
-  const q = $("#pickerInput").value.trim();
-  const list = (q ? searchChannels(q, state.channels) : smartShuffle(state.channels)).slice(0, 80);
-  const wrap = $("#pickerResults");
-  wrap.innerHTML = "";
-  list.forEach((c) => wrap.appendChild(pickerRow(c, () => { addToMultiview(c.id); closePicker(); })));
-}
-function pickerRow(c, fn) {
-  const row = el("button", "picker-row", `
-    <span class="picker-logo">${logoHTML(c)}</span>
-    <span class="picker-meta"><b>${esc(c.name)}</b><span>${esc(meta(c))}</span></span>
-    <span class="picker-add">+</span>
-  `);
-  row.type = "button";
-  row.addEventListener("click", fn);
-  return row;
+function showFavorites() {
+  const favs = [...state.favorites].map((id) => state.byId.get(id)).filter(Boolean);
+  showGrid("Favorites", favs, "favorites");
 }
 
-/* ============================================================
- * Rendering helpers
- * ============================================================ */
-
-function pickFeatured() {
-  const pools = ["news", "sports", "movies", "music", "documentary"];
-  for (const cat of pools) {
-    const list = state.channels.filter((c) => c.logo && c.categories.includes(cat));
-    if (list.length) return smartShuffle(list)[0];
-  }
-  return smartShuffle(state.channels)[0] || null;
-}
-function setHero(channel) {
-  state.current = channel || state.current;
-  if (!channel) return;
-  $("#heroTitle").textContent = channel.name;
-  $("#heroDesc").textContent = `${meta(channel)}. Public listing with ${channel.urls.length} available source${channel.urls.length === 1 ? "" : "s"}.`;
-}
 function buildRow(title, channels, moreFn) {
-  const row = el("section", "row");
+  const section = el("section", "row");
   const head = el("div", "row-head", `<h2>${esc(title)}</h2>`);
   if (moreFn) {
     const more = el("button", "", "View all");
@@ -444,95 +437,137 @@ function buildRow(title, channels, moreFn) {
   }
   const scroll = el("div", "row-scroll");
   channels.forEach((c) => scroll.appendChild(channelCard(c)));
-  row.append(head, scroll);
-  enhanceOptics(row);
-  return row;
-}
-function buildSpotlight() {
-  const cats = ["sports", "news", "movies", "music", "entertainment", "documentary"];
-  const picks = [];
-  const used = new Set();
-  cats.forEach((cat) => {
-    const list = state.channels.filter((c) => c.logo && c.categories.includes(cat) && !used.has(c.id));
-    if (list.length) { const c = smartShuffle(list)[0]; picks.push(c); used.add(c.id); }
-  });
-  smartShuffle(state.channels.filter((c) => c.logo && !used.has(c.id))).slice(0, 8).forEach((c) => {
-    if (picks.length < 8) { picks.push(c); used.add(c.id); }
-  });
-  if (!picks.length) return null;
-  const wrap = el("section", "row");
-  wrap.appendChild(el("div", "bento-label", `<span class="live-dot"></span><h2>On now</h2>`));
-  const bento = el("div", "bento");
-  picks.forEach((c, i) => bento.appendChild(bentoTile(c, i === 0 ? "big" : i < 3 ? "wide" : "")));
-  wrap.appendChild(bento);
-  enhanceOptics(wrap);
-  return wrap;
-}
-function bentoTile(c, span) {
-  const hue = hueFor(c);
-  const tile = el("article", `bento-tile ${span}`.trim(), `
-    ${c.logo ? `<img class="b-logo" src="${esc(c.logo)}" alt="" loading="lazy" />` : `<div class="b-fallback">${initials(c.name)}</div>`}
-    <div class="b-glass"><span class="b-now">Live</span><div class="b-name">${esc(c.name)}</div><div class="b-meta">${esc(meta(c))}</div></div>
-  `);
-  tile.style.setProperty("--g1", `hsl(${hue} 80% 28%)`);
-  tile.style.setProperty("--g2", `hsl(${(hue + 52) % 360} 70% 12%)`);
-  tile.tabIndex = 0;
-  tile.addEventListener("click", () => openPlayer(c));
-  tile.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") openPlayer(c); });
-  return tile;
+  section.append(head, scroll);
+  return section;
 }
 function channelCard(c) {
-  const card = el("article", "card", `
-    <div class="card-thumb">
-      <span class="badge">Live</span>
-      ${logoHTML(c)}
-      <button class="card-fav icon-button ${state.favorites.has(c.id) ? "on" : ""}" aria-label="Favorite ${esc(c.name)}">★</button>
-    </div>
+  const card = el("article", "channel-card", `
+    <div class="card-thumb"><span class="badge">Live</span>${logoHTML(c)}<button class="card-fav icon-btn ${state.favorites.has(c.id) ? "on" : ""}" type="button" aria-label="Favorite ${esc(c.name)}">★</button></div>
     <div class="card-body"><div class="card-title">${esc(c.name)}</div><div class="card-meta">${esc(meta(c))}</div></div>
   `);
   card.tabIndex = 0;
-  card.addEventListener("click", () => openPlayer(c));
-  card.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") openPlayer(c); });
+  card.addEventListener("click", () => previewSignal(c, true));
+  card.addEventListener("dblclick", () => openPlayer(c));
+  card.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") previewSignal(c, true); });
   $(".card-fav", card).addEventListener("click", (event) => { event.stopPropagation(); toggleFavorite(c.id); });
   return card;
 }
 function indexCard(title, sub, fn) {
-  const card = el("button", "card", `
-    <div class="card-thumb"><span class="badge secure">Index</span><span class="fallback-logo">${initials(title)}</span></div>
-    <div class="card-body"><div class="card-title">${esc(title)}</div><div class="card-meta">${esc(sub)}</div></div>
-  `);
+  const card = el("button", "index-card", `<div class="card-thumb"><span class="logo-fallback">${initials(title)}</span></div><div class="card-body"><div class="card-title">${esc(title)}</div><div class="card-meta">${esc(sub)}</div></div>`);
   card.type = "button";
   card.addEventListener("click", fn);
   return card;
 }
-function logoHTML(c) {
-  return c.logo ? `<img src="${esc(c.logo)}" alt="" loading="lazy" />` : `<span class="fallback-logo">${initials(c.name)}</span>`;
+
+/* ============================================================
+ * Command scanner
+ * ============================================================ */
+
+function openCommand() {
+  show("#commandOverlay");
+  const input = $("#commandInput");
+  input.value = "";
+  renderCommandResults();
+  input.focus({ preventScroll: true });
 }
-function initials(name) {
-  return String(name || "TV").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join("").toUpperCase() || "TV";
+function closeCommand() { hide("#commandOverlay"); }
+function renderCommandResults() {
+  const q = $("#commandInput").value.trim();
+  const out = $("#commandResults");
+  out.innerHTML = "";
+  const actions = [
+    ["Open Signalverse", "Return to the orbiting signal field", () => { closeCommand(); renderSignalverse(); }],
+    ["Scan strong signals", "Show logo-rich channels with better source depth", () => { closeCommand(); renderSignalverse(sampleStrongSignals()); }],
+    ["Jump far away", "Load a distant country/category cluster", () => { closeCommand(); jumpFarAway(); }],
+    ["Signal Wall", "Open multi-stream wall", () => { closeCommand(); showWall(); }],
+    ["Favorites", "Open saved local favorites", () => { closeCommand(); showFavorites(); }],
+  ];
+  actions.filter(([a, b]) => !q || `${a} ${b}`.toLowerCase().includes(q.toLowerCase())).forEach(([a, b, fn]) => out.appendChild(resultRow({ title: a, sub: b, mark: "⌘" }, fn)));
+  const matches = q ? searchChannels(q).slice(0, 12) : smartShuffle(state.all).slice(0, 10);
+  matches.forEach((c) => out.appendChild(resultRow(c, () => { closeCommand(); previewSignal(c, true); })));
 }
-function meta(c) {
-  const cat = c.categories.map((id) => state.catName.get(id)).filter(Boolean)[0];
-  return [c.flag || "", c.countryName, cat, c.network].filter(Boolean).join(" · ");
+
+/* ============================================================
+ * Signal Wall
+ * ============================================================ */
+
+function showWall() {
+  setActive("wall");
+  hide("#signalverse");
+  clearViews();
+  show("#wall");
+  renderWall();
 }
-function hueFor(c) {
-  const key = c.categories[0] || c.country || c.name;
-  let n = 0;
-  for (let i = 0; i < key.length; i++) n = (n * 31 + key.charCodeAt(i)) % 360;
-  return n;
+function setWallCols(cols) {
+  state.wallCols = cols;
+  $$(".seg-btn").forEach((b) => b.classList.toggle("active", Number(b.dataset.cols) === cols));
+  $("#wallGrid").style.setProperty("--wall-cols", cols);
 }
-function countBy(expand) {
-  const map = new Map();
-  for (const c of state.channels) for (const key of expand(c)) if (key) map.set(key, (map.get(key) || 0) + 1);
-  return map;
+function renderWall() {
+  teardownWall();
+  const grid = $("#wallGrid");
+  grid.innerHTML = "";
+  grid.style.setProperty("--wall-cols", state.wallCols);
+  state.wall.map((id) => state.byId.get(id)).filter(Boolean).forEach((c) => grid.appendChild(wallTile(c)));
+  const add = el("button", "wall-add", `<span><b>+</b>Add signal</span>`);
+  add.type = "button";
+  add.addEventListener("click", openWallPicker);
+  grid.appendChild(add);
 }
-function smartShuffle(list) {
-  const copy = [...list];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
+function openWallPicker() {
+  show("#wallPickerOverlay");
+  const input = $("#wallPickerInput");
+  input.value = "";
+  renderWallPickerResults();
+  input.focus({ preventScroll: true });
+}
+function closeWallPicker() { hide("#wallPickerOverlay"); }
+function renderWallPickerResults() {
+  const q = $("#wallPickerInput").value.trim();
+  const list = (q ? searchChannels(q) : smartShuffle(state.all)).slice(0, 80);
+  const out = $("#wallPickerResults");
+  out.innerHTML = "";
+  list.forEach((c) => out.appendChild(resultRow(c, () => { addWall(c.id); closeWallPicker(); })));
+}
+function addWall(id) {
+  if (!state.wall.includes(id)) state.wall.push(id);
+  state.wall = state.wall.slice(0, 9);
+  persistUserState();
+  renderWall();
+}
+function removeWall(id) {
+  state.wall = state.wall.filter((x) => x !== id);
+  persistUserState();
+  renderWall();
+}
+function wallTile(c) {
+  const tile = el("article", "wall-tile", `<video muted autoplay playsinline></video><div class="wall-bar"><span class="wall-name">${esc(c.name)}</span><button class="wall-btn" type="button" title="Mute">🔇</button><button class="wall-btn" type="button" title="Remove">×</button></div>`);
+  const video = $("video", tile);
+  const [mute, remove] = $$(".wall-btn", tile);
+  mute.addEventListener("click", () => { video.muted = !video.muted; mute.textContent = video.muted ? "🔇" : "🔊"; });
+  remove.addEventListener("click", () => removeWall(c.id));
+  attachMiniPlayer(video, c.urls[0], tile);
+  return tile;
+}
+function attachMiniPlayer(video, url, tile) {
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = url;
+    video.play().catch(() => {});
+    return;
   }
-  return copy;
+  if (window.Hls && Hls.isSupported()) {
+    const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+    hls.on(Hls.Events.ERROR, (_event, data) => { if (data.fatal) tile.innerHTML = `<div class="wall-off">Signal unavailable</div>`; });
+    state.wallPlayers.push(hls);
+  } else tile.innerHTML = `<div class="wall-off">HLS unsupported</div>`;
+}
+function teardownWall() {
+  state.wallPlayers.forEach((hls) => hls.destroy());
+  state.wallPlayers = [];
+  $$("#wallGrid video").forEach((v) => { v.pause(); v.removeAttribute("src"); v.load(); });
 }
 
 /* ============================================================
@@ -544,7 +579,6 @@ function openPlayer(channel) {
   state.current = channel;
   state.sourceIndex = 0;
   remember(channel.id);
-  setHero(channel);
   updatePlayerInfo();
   show("#playerOverlay");
   loadPlayerSource();
@@ -553,8 +587,7 @@ function updatePlayerInfo() {
   const c = state.current;
   $("#playerTitle").textContent = c.name;
   $("#playerSub").textContent = meta(c) || "Public live stream";
-  $("#playerLogo").src = c.logo || "";
-  $("#playerLogo").hidden = !c.logo;
+  $("#playerLogo").innerHTML = logoHTML(c);
   $("#playerFav").classList.toggle("on", state.favorites.has(c.id));
   $("#playerSource").hidden = c.urls.length < 2;
   $("#playerSource").textContent = `Source ${state.sourceIndex + 1}/${c.urls.length}`;
@@ -562,12 +595,11 @@ function updatePlayerInfo() {
 }
 function loadPlayerSource() {
   const c = state.current;
-  const video = $("#video");
   const url = c.urls[state.sourceIndex];
+  const video = $("#video");
   hide("#playerFail");
   show("#playerLoading");
   updatePlayerInfo();
-
   if (state.hls) { state.hls.destroy(); state.hls = null; }
   video.pause();
   video.removeAttribute("src");
@@ -575,12 +607,8 @@ function loadPlayerSource() {
 
   const fail = () => {
     hide("#playerLoading");
-    if (state.sourceIndex < c.urls.length - 1) {
-      state.sourceIndex++;
-      loadPlayerSource();
-    } else {
-      show("#playerFail");
-    }
+    if (state.sourceIndex < c.urls.length - 1) { state.sourceIndex++; loadPlayerSource(); }
+    else show("#playerFail");
   };
 
   if (video.canPlayType("application/vnd.apple.mpegurl")) {
@@ -592,10 +620,7 @@ function loadPlayerSource() {
     state.hls.attachMedia(video);
     state.hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
     state.hls.on(Hls.Events.ERROR, (_event, data) => { if (data.fatal) fail(); });
-  } else {
-    fail();
-    return;
-  }
+  } else fail();
 
   video.onplaying = () => hide("#playerLoading");
   video.onerror = fail;
@@ -613,23 +638,12 @@ function closePlayer() {
   hide("#playerOverlay");
   hide("#playerDetails");
 }
-function togglePlayerDetails() {
-  const details = $("#playerDetails");
-  details.hidden = !details.hidden;
-}
+function toggleDetails() { $("#playerDetails").hidden = !$("#playerDetails").hidden; }
 function renderPlayerDetails() {
   const c = state.current;
-  const details = $("#playerDetails");
   const cats = c.categories.map((id) => state.catName.get(id) || id).join(", ") || "—";
   const website = c.website ? `<a href="${esc(c.website)}" target="_blank" rel="noopener">Official website</a>` : "—";
-  details.innerHTML = `<dl>
-    <dt>Channel</dt><dd>${esc(c.name)}</dd>
-    <dt>Country</dt><dd>${esc(c.flag ? `${c.flag} ${c.countryName}` : c.countryName || "—")}</dd>
-    <dt>Categories</dt><dd>${esc(cats)}</dd>
-    <dt>Network</dt><dd>${esc(c.network || "—")}</dd>
-    <dt>Sources</dt><dd>${c.urls.length}</dd>
-    <dt>Website</dt><dd>${website}</dd>
-  </dl>`;
+  $("#playerDetails").innerHTML = `<dl><dt>Channel</dt><dd>${esc(c.name)}</dd><dt>Country</dt><dd>${esc(c.flag ? `${c.flag} ${c.countryName}` : c.countryName || "—")}</dd><dt>Categories</dt><dd>${esc(cats)}</dd><dt>Network</dt><dd>${esc(c.network || "—")}</dd><dt>Signal score</dt><dd>${c.health}/100</dd><dt>Sources</dt><dd>${c.urls.length}</dd><dt>Website</dt><dd>${website}</dd></dl>`;
 }
 async function requestPip() {
   const video = $("#video");
@@ -641,28 +655,62 @@ async function requestPip() {
 }
 
 /* ============================================================
- * Favorites, recent, surprise
+ * Utilities
  * ============================================================ */
 
-function toggleFavorite(id, refreshPlayer = false) {
+function resultRow(item, fn) {
+  const isChannel = !!item.id;
+  const row = el("button", "result-row", isChannel ? `
+    <span class="result-logo">${logoHTML(item)}</span><span class="result-meta"><b>${esc(item.name)}</b><span>${esc(meta(item))}</span></span><span class="result-action">›</span>
+  ` : `<span class="result-logo">${esc(item.mark || "⌘")}</span><span class="result-meta"><b>${esc(item.title)}</b><span>${esc(item.sub)}</span></span><span class="result-action">›</span>`);
+  row.type = "button";
+  row.addEventListener("click", fn);
+  return row;
+}
+function searchChannels(query) {
+  const q = query.toLowerCase();
+  return state.all.filter((c) => [c.name, c.countryName, c.country, c.network, c.city, ...c.altNames, ...c.categories.map((id) => state.catName.get(id) || id)].join(" ").toLowerCase().includes(q));
+}
+function logoHTML(c) {
+  if (!c || !c.logo) return `<span class="logo-fallback">${initials(c?.name || "TV")}</span>`;
+  return `<img src="${esc(c.logo)}" alt="" loading="lazy" />`;
+}
+function initials(name) { return String(name || "TV").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join("").toUpperCase() || "TV"; }
+function meta(c) {
+  const cat = c.categories.map((id) => state.catName.get(id)).filter(Boolean)[0];
+  return [c.flag || "", c.countryName, cat, c.network].filter(Boolean).join(" · ");
+}
+function hueFor(c) {
+  const key = c.categories[0] || c.country || c.name || "signal";
+  let n = 0;
+  for (let i = 0; i < key.length; i++) n = (n * 31 + key.charCodeAt(i)) % 360;
+  return n;
+}
+function countBy(expand) {
+  const map = new Map();
+  for (const c of state.all) for (const key of expand(c)) if (key) map.set(key, (map.get(key) || 0) + 1);
+  return map;
+}
+function smartShuffle(list) {
+  const copy = [...list];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+function toggleFavorite(id, refresh = false) {
   if (state.favorites.has(id)) state.favorites.delete(id);
   else state.favorites.add(id);
-  writeJSON(SAFE_STORAGE.favs, [...state.favorites]);
-  $$(".card").forEach((card) => {
-    const title = $(".card-title", card)?.textContent;
-    const c = state.channels.find((x) => x.name === title);
-    if (c) $(".card-fav", card)?.classList.toggle("on", state.favorites.has(c.id));
-  });
-  if (refreshPlayer) updatePlayerInfo();
-  toast(state.favorites.has(id) ? "Added to favorites." : "Removed from favorites.");
+  persistUserState();
+  if (state.selected?.id === id) $("#previewFav").textContent = state.favorites.has(id) ? "Favorited" : "Favorite";
+  if (refresh && state.current) updatePlayerInfo();
+  $$(".card-fav").forEach((btn) => btn.classList.remove("on"));
+  toast(state.favorites.has(id) ? "Signal saved to favorites." : "Signal removed from favorites.");
 }
 function remember(id) {
   state.recent = [id, ...state.recent.filter((x) => x !== id)].slice(0, 40);
-  writeJSON(SAFE_STORAGE.recent, state.recent);
-}
-function surprise() {
-  const pick = smartShuffle(state.channels)[0];
-  if (pick) openPlayer(pick);
+  persistUserState();
 }
 function toast(message) {
   const node = $("#toast");
@@ -670,154 +718,64 @@ function toast(message) {
   node.hidden = false;
   requestAnimationFrame(() => node.classList.add("show"));
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => {
-    node.classList.remove("show");
-    setTimeout(() => node.hidden = true, 260);
-  }, 2200);
+  toast.timer = setTimeout(() => { node.classList.remove("show"); setTimeout(() => node.hidden = true, 260); }, 2100);
 }
 
 /* ============================================================
- * Multiview
+ * Optical interactions
  * ============================================================ */
 
-function showMultiview() {
-  setActiveNav("multiview");
-  clearMain();
-  $("#hero").hidden = true;
-  show("#multiview");
-  renderMultiview();
-}
-function setMultiCols(cols) {
-  state.multiCols = cols;
-  $$(".seg-btn").forEach((b) => b.classList.toggle("active", Number(b.dataset.cols) === cols));
-  $("#mvGrid").style.setProperty("--mv-cols", cols);
-}
-function addToMultiview(id) {
-  if (!state.multi.includes(id)) state.multi.push(id);
-  state.multi = state.multi.slice(0, 9);
-  writeJSON(SAFE_STORAGE.multiview, state.multi);
-  renderMultiview();
-}
-function removeFromMultiview(id) {
-  state.multi = state.multi.filter((x) => x !== id);
-  writeJSON(SAFE_STORAGE.multiview, state.multi);
-  renderMultiview();
-}
-function renderMultiview() {
-  teardownMultiview();
-  const grid = $("#mvGrid");
-  grid.innerHTML = "";
-  grid.style.setProperty("--mv-cols", state.multiCols);
-  state.multi.map((id) => state.byId.get(id)).filter(Boolean).forEach((c) => grid.appendChild(mvTile(c)));
-  const add = el("button", "mv-add", `<span class="mv-add-inner"><span>+</span><b>Add channel</b><small>Search public streams</small></span>`);
-  add.type = "button";
-  add.addEventListener("click", openPicker);
-  grid.appendChild(add);
-}
-function mvTile(c) {
-  const tile = el("article", "mv-tile", `<video muted playsinline autoplay></video><div class="mv-bar"><span class="mv-name">${esc(c.name)}</span><button class="mv-btn" title="Unmute">🔇</button><button class="mv-btn" title="Remove">×</button></div>`);
-  const video = $("video", tile);
-  const mute = $$(".mv-btn", tile)[0];
-  const remove = $$(".mv-btn", tile)[1];
-  remove.addEventListener("click", () => removeFromMultiview(c.id));
-  mute.addEventListener("click", () => { video.muted = !video.muted; mute.textContent = video.muted ? "🔇" : "🔊"; });
-  attachMiniPlayer(video, c.urls[0], tile);
-  return tile;
-}
-function attachMiniPlayer(video, url, tile) {
-  if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    video.src = url;
-    video.play().catch(() => {});
-    return;
-  }
-  if (window.Hls && Hls.isSupported()) {
-    const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
-    hls.loadSource(url);
-    hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
-    hls.on(Hls.Events.ERROR, (_e, data) => { if (data.fatal) markMvOff(tile); });
-    state.mvPlayers.push(hls);
-  } else markMvOff(tile);
-}
-function markMvOff(tile) { tile.innerHTML = `<div class="mv-off">Stream unavailable</div>`; }
-function teardownMultiview() {
-  state.mvPlayers.forEach((hls) => hls.destroy());
-  state.mvPlayers = [];
-  $$("#mvGrid video").forEach((v) => { v.pause(); v.removeAttribute("src"); v.load(); });
-}
-
-/* ============================================================
- * Optical interaction layer
- * ============================================================ */
-
-function updateOpticPointer(event) {
-  const candidates = ["[data-optic]", ".card", ".bento-tile", ".btn", ".icon-button", ".optic-control", ".search-surface", ".nav-item", ".chip"].join(",");
-  const target = event.target.closest?.(candidates);
+function opticPointer(event) {
+  const target = event.target.closest?.(".material,.signal-node,.channel-card,.index-card,.pill-btn,.primary-action,.secondary-action,.icon-btn,.nav-item,.filter-chip,.search-box");
   if (!target) return;
   const rect = target.getBoundingClientRect();
   const x = ((event.clientX - rect.left) / rect.width) * 100;
   const y = ((event.clientY - rect.top) / rect.height) * 100;
   target.style.setProperty("--mx", `${x.toFixed(2)}%`);
   target.style.setProperty("--my", `${y.toFixed(2)}%`);
-
-  if (target.classList.contains("card") || target.classList.contains("bento-tile")) {
-    const rx = ((event.clientY - rect.top) / rect.height - .5) * -5;
-    const ry = ((event.clientX - rect.left) / rect.width - .5) * 7;
-    target.style.setProperty("--rx", `${rx.toFixed(2)}deg`);
-    target.style.setProperty("--ry", `${ry.toFixed(2)}deg`);
-  }
 }
-function enhanceOptics(root = document) {
-  $$(".card, .bento-tile", root).forEach((node) => {
-    node.addEventListener("mouseleave", () => {
-      node.style.setProperty("--rx", "0deg");
-      node.style.setProperty("--ry", "0deg");
-    });
-  });
-}
-function createContactLight(event) {
-  const host = event.target.closest?.(".kinetic-surface, .kinetic-card, .card, .bento-tile, .btn, .icon-button, .nav-item, .search-surface");
+function contactLight(event) {
+  if (event.target.closest?.("input, textarea, select")) return;
+  const host = event.target.closest?.(".material,.signal-node,.channel-card,.index-card,.pill-btn,.primary-action,.secondary-action,.icon-btn,.nav-item,.filter-chip");
   if (!host) return;
   const rect = host.getBoundingClientRect();
   const ripple = document.createElement("span");
-  ripple.style.cssText = `position:absolute;left:${event.clientX - rect.left}px;top:${event.clientY - rect.top}px;width:12px;height:12px;border-radius:50%;pointer-events:none;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(255,255,255,.65),rgba(142,232,255,.22),transparent 72%);border:1px solid rgba(255,255,255,.35);animation:contactPulse .72s ease-out forwards;mix-blend-mode:screen;z-index:9;`;
+  ripple.style.cssText = `position:absolute;left:${event.clientX - rect.left}px;top:${event.clientY - rect.top}px;width:10px;height:10px;border-radius:50%;pointer-events:none;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(255,255,255,.68),rgba(142,232,255,.22),transparent 72%);border:1px solid rgba(255,255,255,.35);animation:contactPulse .7s ease-out forwards;mix-blend-mode:screen;z-index:20;`;
   host.appendChild(ripple);
   setTimeout(() => ripple.remove(), 760);
 }
+const contactStyle = document.createElement("style");
+contactStyle.textContent = `@keyframes contactPulse{to{width:260px;height:260px;opacity:0}}`;
+document.head.appendChild(contactStyle);
 
-const style = document.createElement("style");
-style.textContent = `@keyframes contactPulse{to{width:260px;height:260px;opacity:0}}`;
-document.head.appendChild(style);
-
-function bootLightField() {
-  const canvas = $("#lightField");
+function bootStarfield() {
+  const canvas = $("#starfield");
+  if (!canvas) return;
   const ctx = canvas.getContext("2d", { alpha: true });
-  let w = 0, h = 0, dpr = 1;
-  const points = Array.from({ length: 34 }, (_, i) => ({
-    x: Math.random(), y: Math.random(), r: 1 + Math.random() * 2, s: .0006 + Math.random() * .0014, a: Math.random() * Math.PI * 2, hue: i % 3,
+  let width = 0, height = 0, dpr = 1;
+  const particles = Array.from({ length: 90 }, (_, i) => ({
+    x: Math.random(), y: Math.random(), r: .6 + Math.random() * 1.8, v: .00025 + Math.random() * .0009, a: Math.random() * Math.PI * 2, h: i % 3,
   }));
   function resize() {
     dpr = Math.min(2, window.devicePixelRatio || 1);
-    w = canvas.width = Math.floor(innerWidth * dpr);
-    h = canvas.height = Math.floor(innerHeight * dpr);
+    width = canvas.width = Math.floor(innerWidth * dpr);
+    height = canvas.height = Math.floor(innerHeight * dpr);
     canvas.style.width = `${innerWidth}px`;
     canvas.style.height = `${innerHeight}px`;
   }
   function draw() {
-    ctx.clearRect(0, 0, w, h);
+    ctx.clearRect(0, 0, width, height);
     ctx.globalCompositeOperation = "lighter";
-    for (const p of points) {
-      p.a += p.s;
-      const x = (p.x + Math.sin(p.a) * .035) * w;
-      const y = (p.y + Math.cos(p.a * .8) * .035) * h;
-      const g = ctx.createRadialGradient(x, y, 0, x, y, 120 * dpr);
-      const color = p.hue === 0 ? "142,232,255" : p.hue === 1 ? "182,156,255" : "255,226,168";
-      g.addColorStop(0, `rgba(${color},.16)`);
+    for (const p of particles) {
+      p.a += p.v;
+      const x = (p.x + Math.sin(p.a) * .025) * width;
+      const y = (p.y + Math.cos(p.a * .8) * .025) * height;
+      const color = p.h === 0 ? "142,232,255" : p.h === 1 ? "182,156,255" : "255,226,168";
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 90 * dpr);
+      g.addColorStop(0, `rgba(${color},.15)`);
       g.addColorStop(1, `rgba(${color},0)`);
       ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(x, y, 120 * dpr, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 90 * dpr, 0, Math.PI * 2); ctx.fill();
     }
     requestAnimationFrame(draw);
   }
