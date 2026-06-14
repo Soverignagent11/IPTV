@@ -93,6 +93,16 @@ async function loadData() {
         };
       });
 
+    // Merge in FAST services (Samsung TV Plus, Pluto, Plex, …). These are
+    // fetched resiliently — if any source is unreachable/blocked we just skip
+    // it, so the core iptv-org catalog always works.
+    if (onHttps || location.protocol === "http:") {
+      const fast = await loadFastSources(countryMap);
+      // De-dupe by id; FAST ids are provider-prefixed so they won't collide.
+      const seen = new Set(state.channels.map((c) => c.id));
+      for (const c of fast) if (!seen.has(c.id)) { state.channels.push(c); seen.add(c.id); }
+    }
+
     state.channels.forEach((c) => state.byId.set(c.id, c));
     hide("#loading");
     boot();
@@ -101,6 +111,84 @@ async function loadData() {
     hide("#loading");
     show("#loadError");
   }
+}
+
+/* ---- FAST / free ad-supported services via i.mjh.nz (HLS, https, reliable) ---- */
+const FAST_SOURCES = [
+  { id: "samsung", name: "Samsung TV Plus", url: "https://i.mjh.nz/SamsungTVPlus/all.m3u8" },
+  { id: "pluto",   name: "Pluto TV",        url: "https://i.mjh.nz/PlutoTV/all.m3u8" },
+  { id: "plex",    name: "Plex",            url: "https://i.mjh.nz/Plex/all.m3u8" },
+  { id: "stirr",   name: "Stirr",           url: "https://i.mjh.nz/Stirr/all.m3u8" },
+  { id: "roku",    name: "Roku",            url: "https://i.mjh.nz/Roku/all.m3u8" },
+  { id: "pbs",     name: "PBS",             url: "https://i.mjh.nz/PBS/all.m3u8" },
+];
+
+async function loadFastSources(countryMap) {
+  // Map category *names* -> iptv ids so FAST group-titles slot into our rows.
+  const catByName = new Map(state.categories.map((c) => [c.name.toLowerCase(), c.id]));
+  const results = await Promise.allSettled(
+    FAST_SOURCES.map((s) =>
+      fetch(s.url).then((r) => (r.ok ? r.text() : Promise.reject(r.status))).then((t) => ({ s, t }))
+    )
+  );
+  const channels = [];
+  for (const res of results) {
+    if (res.status !== "fulfilled") continue;
+    const { s, t } = res.value;
+    for (const e of parseM3U(t)) {
+      if (!e.url.startsWith("https:")) continue;     // https-only on a secure site
+      const id = `${s.id}:${e.tvgId || e.name}`;
+      // Region code is often the tvg-id suffix, e.g. "Channel.us".
+      const cc = (e.tvgId.match(/\.([a-z]{2})$/i) || [])[1];
+      const code = cc ? cc.toUpperCase() : "";
+      const country = code ? countryMap.get(code) : null;
+      // Match the playlist's group to one of our categories when possible.
+      const g = e.group.toLowerCase();
+      const catId = catByName.get(g) || [...catByName.keys()].find((n) => g.includes(n));
+      channels.push({
+        id,
+        name: e.name,
+        logo: e.logo,
+        urls: [e.url],
+        categories: catId ? [catByName.get(g) || catId] : [],
+        country: code,
+        countryName: country ? country.name : "",
+        flag: country ? country.flag : "",
+        network: s.name,
+        provider: s.name,
+        owners: [],
+        city: "",
+        launched: "",
+        closed: "",
+        website: "",
+        altNames: [],
+      });
+    }
+  }
+  return channels;
+}
+
+function parseM3U(text) {
+  const out = [];
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith("#EXTINF")) continue;
+    const info = lines[i];
+    let url = "";
+    for (let j = i + 1; j < lines.length && j < i + 4; j++) {
+      const l = lines[j].trim();
+      if (l && !l.startsWith("#")) { url = l; break; }
+    }
+    if (!url) continue;
+    out.push({
+      name: (info.split(",").pop() || "").trim(),
+      logo: (info.match(/tvg-logo="([^"]*)"/) || [])[1] || "",
+      tvgId: (info.match(/tvg-id="([^"]*)"/) || [])[1] || "",
+      group: (info.match(/group-title="([^"]*)"/) || [])[1] || "",
+      url,
+    });
+  }
+  return out;
 }
 
 /* ============================================================
@@ -330,6 +418,7 @@ function onSearch(q) {
   const list = state.channels.filter((c) =>
     c.name.toLowerCase().includes(q) ||
     c.countryName.toLowerCase().includes(q) ||
+    (c.network || "").toLowerCase().includes(q) ||
     c.categories.some((cat) => (state.catName.get(cat) || cat).toLowerCase().includes(q))
   );
   renderGrid(`Results for “${q}”`, list);
