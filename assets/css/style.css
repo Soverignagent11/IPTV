@@ -17,6 +17,11 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* The [hidden] attribute must always win, even over class rules that set
+   display (e.g. the player overlay uses display:grid). Without this the
+   popup shows on load and can't be closed. */
+[hidden] { display: none !important; }
+
 html, body {
   height: 100%;
   background: var(--bg);
