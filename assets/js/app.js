@@ -248,6 +248,9 @@ function renderHome() {
   rows.innerHTML = "";
   ensureHero();
 
+  const spotlight = buildSpotlight();
+  if (spotlight) rows.appendChild(spotlight);
+
   if (state.recent.length) {
     const rec = state.recent.map((id) => state.byId.get(id)).filter(Boolean);
     if (rec.length) rows.appendChild(buildRow("🕘 Recently watched", rec.slice(0, 20)));
@@ -270,6 +273,43 @@ function renderHome() {
     const list = state.channels.filter((c) => c.categories.includes(cat));
     if (list.length) rows.appendChild(buildRow(title, shuffle(list).slice(0, 18), () => showCategory(cat)));
   }
+}
+
+/* ----- Living Bento spotlight (adaptive, importance-weighted) ----- */
+function buildSpotlight() {
+  const want = ["sports", "news", "movies", "music", "entertainment"];
+  const picks = [], used = new Set();
+  for (const cat of want) {
+    const list = state.channels.filter((c) => c.logo && c.categories.includes(cat) && !c.nsfw && !used.has(c.id));
+    if (list.length) { const c = shuffle(list)[0]; picks.push(c); used.add(c.id); }
+  }
+  const extra = shuffle(state.channels.filter((c) => c.logo && !c.nsfw && !used.has(c.id)));
+  while (picks.length < 7 && extra.length) { const c = extra.pop(); if (!used.has(c.id)) { picks.push(c); used.add(c.id); } }
+  if (!picks.length) return null;
+  const wrap = el("div");
+  wrap.appendChild(el("div", "bento-label", `<span class="live-dot"></span><h2>On now</h2>`));
+  const bento = el("div", "bento");
+  picks.forEach((c, i) => bento.appendChild(bentoTile(c, i === 0 ? "big" : (i <= 2 ? "wide" : ""))));
+  wrap.appendChild(bento);
+  return wrap;
+}
+function bentoTile(c, span) {
+  let hue = 250;
+  for (const cat of c.categories) { if (CAT_HUE[cat] != null) { hue = CAT_HUE[cat]; break; } }
+  const t = el("div", "b-tile" + (span ? " " + span : ""));
+  t.style.setProperty("--g1", `hsl(${hue} 55% 32%)`);
+  t.style.setProperty("--g2", `hsl(${(hue + 30) % 360} 45% 12%)`);
+  const initials = c.name.replace(/[^A-Za-z0-9 ]/g, "").trim().slice(0, 2).toUpperCase() || "TV";
+  const cats = c.categories.map((x) => state.catName.get(x) || x);
+  t.innerHTML =
+    (c.logo ? `<img class="b-logo" src="${esc(c.logo)}" alt="" loading="lazy">` : `<div class="b-fallback">${esc(initials)}</div>`) +
+    `<div class="b-sheen"></div>` +
+    (c.experimental ? `<span class="b-badge beta">beta</span>` : "") +
+    `<div class="b-glass"><span class="b-now">On now</span><div class="b-name">${esc(c.name)}</div><div class="b-meta">${esc((c.flag ? c.flag + " " : "") + (c.countryName || "") + (cats[0] ? " · " + cats[0] : ""))}</div></div>`;
+  const img = t.querySelector(".b-logo");
+  if (img) img.onerror = function () { this.outerHTML = `<div class="b-fallback">${esc(initials)}</div>`; };
+  t.onclick = () => openPlayer(c);
+  return t;
 }
 
 function buildRow(title, channels, onSeeAll) {
@@ -893,7 +933,7 @@ function auraLoop(t) {
 const canHover = matchMedia("(hover: hover) and (pointer: fine)").matches;
 let tiltEl = null;
 function onTiltMove(e) {
-  const t = e.target.closest(".card");
+  const t = e.target.closest(".card, .b-tile");
   if (t !== tiltEl) { if (tiltEl) { tiltEl.style.setProperty("--rx", "0deg"); tiltEl.style.setProperty("--ry", "0deg"); } tiltEl = t; }
   if (!t) return;
   const r = t.getBoundingClientRect();
@@ -1104,6 +1144,7 @@ function wire() {
   document.addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#cmdOverlay").hidden ? openCmd() : closeCmd(); }
   });
+  $("#cmdBtn").onclick = openCmd;
   $("#cmdClose").onclick = closeCmd;
   $("#cmdOverlay").onclick = (e) => { if (e.target.id === "cmdOverlay") closeCmd(); };
   const cmdIn = $("#cmdInput");

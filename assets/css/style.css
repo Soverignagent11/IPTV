@@ -57,10 +57,10 @@ body::before {
     radial-gradient(38% 46% at 18% 22%, var(--aura-1), transparent 60%),
     radial-gradient(42% 52% at 82% 28%, var(--aura-2), transparent 62%),
     radial-gradient(52% 60% at 50% 96%, var(--aura-3), transparent 66%);
-  filter: blur(60px) saturate(1.35);
-  opacity: 0.55;
+  filter: blur(55px) saturate(1.6);
+  opacity: 0.92;
   transition: background 1s var(--ease);
-  animation: auraDrift 26s ease-in-out infinite alternate;
+  animation: auraDrift 22s ease-in-out infinite alternate;
 }
 @keyframes auraDrift {
   0%   { transform: translate3d(-2%, -1%, 0) scale(1.05) rotate(0deg); }
@@ -400,3 +400,65 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 /* toast undo action + command-palette kbd hint */
 .toast-action { margin-left: 14px; background: rgba(124,108,255,0.3); border: 1px solid var(--accent); color: #fff; font-weight: 700; font-size: 13px; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
 .toast-action:hover { background: rgba(124,108,255,0.5); }
+
+/* ============================================================
+ * Living Bento + temporal "ON NOW" + command button (build 7)
+ * ============================================================ */
+.cmd-btn {
+  flex: 0 0 auto; height: 44px; padding: 0 16px; border-radius: 999px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+  background: var(--glass); border: 1px solid var(--glass-brd); backdrop-filter: blur(10px);
+  color: var(--text); font-size: 13.5px; font-weight: 700;
+}
+.cmd-btn:hover { border-color: var(--accent); }
+.cmd-btn kbd { font: inherit; font-size: 11px; background: rgba(255,255,255,0.1); border-radius: 6px; padding: 2px 6px; }
+
+.bento-label { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; }
+.bento-label h2 { font-size: 22px; font-weight: 850; letter-spacing: -0.5px; }
+.bento-label .live-dot { width: 9px; height: 9px; border-radius: 50%; background: #ff3246; box-shadow: 0 0 12px #ff3246; animation: pulse 1.6s infinite; }
+
+.bento {
+  display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 116px; gap: 14px; margin-bottom: 38px;
+}
+.b-tile {
+  position: relative; overflow: hidden; cursor: pointer; border-radius: var(--radius);
+  border: 1px solid var(--glass-brd); display: flex; align-items: flex-end; min-height: 0;
+  background: linear-gradient(150deg, var(--g1, #2a3354), var(--g2, #0c1020));
+  transform: perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));
+  transition: transform 0.2s var(--ease), box-shadow 0.25s, border-color 0.2s;
+  transform-style: preserve-3d;
+}
+.b-tile:hover { box-shadow: var(--shadow), 0 0 0 1px var(--accent); border-color: transparent; }
+.b-tile.big { grid-column: span 2; grid-row: span 2; }
+.b-tile.wide { grid-column: span 2; }
+.b-logo {
+  position: absolute; top: 14px; left: 14px; max-width: 46%; max-height: 38%;
+  object-fit: contain; filter: drop-shadow(0 6px 18px rgba(0,0,0,0.6)); transition: transform 0.2s;
+}
+.b-tile.big .b-logo { max-height: 46%; }
+.b-tile:hover .b-logo { transform: translateZ(40px) scale(1.05); }
+.b-fallback { position: absolute; top: 14px; left: 14px; font-weight: 850; font-size: 22px; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
+.b-sheen { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.2s; background: radial-gradient(240px circle at var(--mx,50%) var(--my,50%), rgba(255,255,255,0.22), transparent 45%); }
+.b-tile:hover .b-sheen { opacity: 1; }
+.b-glass {
+  position: relative; width: 100%; padding: 12px 14px;
+  background: linear-gradient(0deg, rgba(4,6,12,0.92), rgba(4,6,12,0.35) 70%, transparent);
+}
+.b-now { display: inline-flex; align-items: center; gap: 5px; font-size: 9.5px; font-weight: 800; letter-spacing: 0.6px; color: #ff5d6c; text-transform: uppercase; margin-bottom: 5px; }
+.b-now::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #ff3246; box-shadow: 0 0 8px #ff3246; animation: pulse 1.6s infinite; }
+.b-name { font-size: 14.5px; font-weight: 750; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-tile.big .b-name { font-size: 19px; }
+.b-meta { font-size: 11.5px; color: rgba(255,255,255,0.7); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-badge { position: absolute; top: 12px; right: 12px; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 6px; text-transform: uppercase; color: #fff; }
+.b-badge.beta { background: #b88406; }
+.b-badge.x18 { background: #d6336c; }
+
+@media (max-width: 880px) {
+  .bento { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 124px; gap: 12px; }
+  .b-tile.big { grid-column: span 2; grid-row: span 2; }
+  .b-tile.wide { grid-column: span 2; grid-row: span 1; }
+  .cmd-btn kbd { display: none; }
+}
+@media (max-width: 560px) {
+  .bento { grid-auto-rows: 110px; }
+}
