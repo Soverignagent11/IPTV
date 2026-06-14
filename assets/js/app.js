@@ -7,7 +7,9 @@
 const API = "https://iptv-org.github.io/api";
 
 const state = {
-  channels: [],          // playable channels (have at least one stream)
+  channels: [],          // currently visible channels (adult filter applied)
+  allChannels: [],       // everything loaded, including 18+ and experimental
+  adult: localStorage.getItem("nova:adult") === "1",
   byId: new Map(),
   categories: [],        // {id, name}
   countries: [],         // {code, name, flag}
@@ -52,58 +54,57 @@ async function loadData() {
     // the first. When several sources exist and one is offline or geo-blocked,
     // we can fall through to the next.
     const onHttps = location.protocol === "https:";
-    const streamsForCh = new Map();
+    // Track native https streams and http streams separately per channel.
+    const streamsForCh = new Map();   // id -> { https: [], http: [] }
     for (const s of streams) {
       if (!s.channel || !s.url) continue;
-      // On an https site, http streams are blocked as "mixed content" and can
-      // never play — drop them so the user only sees channels that actually work.
-      const secure = s.url.startsWith("https:");
-      if (onHttps && !secure) continue;
-      if (!streamsForCh.has(s.channel)) streamsForCh.set(s.channel, []);
-      const list = streamsForCh.get(s.channel);
-      if (!list.includes(s.url)) list.push(s.url);
-    }
-    // Prefer https sources first within each channel's list.
-    for (const list of streamsForCh.values()) {
-      list.sort((a, b) => (b.startsWith("https:") ? 1 : 0) - (a.startsWith("https:") ? 1 : 0));
+      const rec = streamsForCh.get(s.channel) || { https: [], http: [] };
+      if (s.url.startsWith("https:")) { if (!rec.https.includes(s.url)) rec.https.push(s.url); }
+      else if (s.url.startsWith("http:")) { if (!rec.http.includes(s.url)) rec.http.push(s.url); }
+      streamsForCh.set(s.channel, rec);
     }
 
-    // Keep only channels we can actually play, and that aren't NSFW.
-    state.channels = channels
-      .filter((c) => streamsForCh.has(c.id) && !c.is_nsfw && !(c.categories || []).includes("xxx"))
-      .map((c) => {
-        const country = countryMap.get(c.country);
-        return {
-          id: c.id,
-          name: c.name,
-          logo: c.logo || "",
-          urls: streamsForCh.get(c.id),
-          categories: c.categories || [],
-          country: c.country || "",
-          countryName: country ? country.name : c.country || "",
-          flag: country ? country.flag : "",
-          // Extra metadata for the channel info guide.
-          network: c.network || "",
-          owners: c.owners || [],
-          city: c.city || "",
-          launched: c.launched || "",
-          closed: c.closed || "",
-          website: c.website || "",
-          altNames: c.alt_names || [],
-        };
+    // Build channels. http-only channels are kept as "experimental": on an https
+    // site we attempt a secure https-upgrade of the URL (no third-party proxy,
+    // so it stays private) — it works on servers that also serve https.
+    const built = [];
+    for (const c of channels) {
+      const rec = streamsForCh.get(c.id);
+      if (!rec) continue;
+      const upgraded = rec.http.map((u) => "https:" + u.slice(5));
+      const urls = onHttps ? [...rec.https, ...upgraded] : [...rec.https, ...rec.http];
+      if (!urls.length) continue;
+      const country = countryMap.get(c.country);
+      built.push({
+        id: c.id,
+        name: c.name,
+        logo: c.logo || "",
+        urls,
+        experimental: rec.https.length === 0,   // only playable via https-upgrade
+        nsfw: !!c.is_nsfw || (c.categories || []).includes("xxx"),
+        categories: c.categories || [],
+        country: c.country || "",
+        countryName: country ? country.name : c.country || "",
+        flag: country ? country.flag : "",
+        network: c.network || "",
+        owners: c.owners || [],
+        city: c.city || "",
+        launched: c.launched || "",
+        closed: c.closed || "",
+        website: c.website || "",
+        altNames: c.alt_names || [],
       });
+    }
 
-    // Merge in FAST services (Samsung TV Plus, Pluto, Plex, …). These are
-    // fetched resiliently — if any source is unreachable/blocked we just skip
-    // it, so the core iptv-org catalog always works.
+    // Merge in FAST services (Samsung TV Plus, Pluto, Plex, …) — resilient.
     if (onHttps || location.protocol === "http:") {
       const fast = await loadFastSources(countryMap);
-      // De-dupe by id; FAST ids are provider-prefixed so they won't collide.
-      const seen = new Set(state.channels.map((c) => c.id));
-      for (const c of fast) if (!seen.has(c.id)) { state.channels.push(c); seen.add(c.id); }
+      const seen = new Set(built.map((c) => c.id));
+      for (const c of fast) if (!seen.has(c.id)) { built.push(c); seen.add(c.id); }
     }
 
-    state.channels.forEach((c) => state.byId.set(c.id, c));
+    state.allChannels = built;
+    applyAdultFilter();
     hide("#loading");
     boot();
   } catch (err) {
@@ -195,6 +196,7 @@ function parseM3U(text) {
  * Rendering
  * ============================================================ */
 function boot() {
+  syncAdultToggle();
   renderQuickCategories();
   renderStats();
   renderHome();
@@ -254,12 +256,12 @@ function renderHome() {
   }
 
   const feature = [
-    ["📰 News", "news"],
     ["🏟️ Sports", "sports"],
+    ["📰 News", "news"],
     ["🎬 Movies", "movies"],
+    ["🎭 Entertainment", "entertainment"],
     ["🎵 Music", "music"],
     ["🧒 Kids", "kids"],
-    ["🎭 Entertainment", "entertainment"],
   ];
   for (const [title, cat] of feature) {
     const list = state.channels.filter((c) => c.categories.includes(cat));
@@ -285,7 +287,7 @@ function buildRow(title, channels, onSeeAll) {
 }
 
 function buildCard(c) {
-  const card = el("div", "card");
+  const card = el("div", "card" + (c.nsfw ? " nsfw" : ""));
   const initials = c.name.replace(/[^A-Za-z0-9 ]/g, "").trim().slice(0, 2).toUpperCase() || "TV";
   const thumb = el("div", "card-thumb");
   if (c.logo) {
@@ -300,6 +302,8 @@ function buildCard(c) {
   }
 
   card.appendChild(el("span", "badge-live", "live"));
+  if (c.nsfw) card.appendChild(el("span", "badge-flag badge-18", "18+"));
+  else if (c.experimental) card.appendChild(el("span", "badge-flag badge-exp", "⚠ beta"));
 
   const fav = el("button", "card-fav" + (state.favorites.has(c.id) ? " on" : ""), "★");
   fav.title = "Toggle favorite";
@@ -433,6 +437,12 @@ let current = { urls: [], idx: 0 };  // active channel's sources + which one we'
 let currentChannel = null;
 
 function openPlayer(c) {
+  // Experimental (https-upgraded) channels show a one-time notice first.
+  if (c.experimental) { experimentalNotice(() => openPlayerNow(c)); return; }
+  openPlayerNow(c);
+}
+
+function openPlayerNow(c) {
   currentChannel = c;
   $("#playerOverlay").hidden = false;
   document.body.style.overflow = "hidden";
@@ -578,6 +588,67 @@ function closePlayer() {
   $("#playerOverlay").hidden = true;
   document.body.style.overflow = "";
   destroyHls();
+}
+
+/* ============================================================
+ * Adult (18+) filter & gating
+ * ============================================================ */
+function applyAdultFilter() {
+  state.channels = state.adult ? state.allChannels : state.allChannels.filter((c) => !c.nsfw);
+  state.byId = new Map(state.channels.map((c) => [c.id, c]));
+}
+
+function setAdult(on) {
+  state.adult = on;
+  localStorage.setItem("nova:adult", on ? "1" : "0");
+  applyAdultFilter();
+  syncAdultToggle();
+  renderHome();
+  if (state.channels.length) renderStats();
+  toast(on ? "🔞 18+ channels enabled" : "18+ channels hidden");
+}
+
+function syncAdultToggle() {
+  const t = $("#adultToggle");
+  if (t) t.classList.toggle("on", state.adult);
+}
+
+function requestAdult() {
+  if (state.adult) { setAdult(false); return; }
+  // Age gate before enabling.
+  showModal({
+    title: "🔞 Adult content — are you 18 or older?",
+    body: "Enabling this reveals sexually explicit (18+) channels from the public list. They'll be clearly marked and blurred until you tap them. Only continue if you are of legal age in your country.",
+    confirmText: "I'm 18+ — show them",
+    cancelText: "Cancel",
+    onConfirm: () => setAdult(true),
+  });
+}
+
+/* One-time notice before playing an https-upgraded (experimental) stream. */
+function experimentalNotice(after) {
+  if (localStorage.getItem("nova:expok") === "1") { after(); return; }
+  showModal({
+    title: "⚠️ Experimental channel",
+    body: "This channel only had an insecure (http) source, so we attempt a secure https-upgrade of the same address — no third-party proxy, so your connection stays private. It works on some servers and not others, and may be less reliable.",
+    confirmText: "Got it, play it",
+    cancelText: "Back",
+    onConfirm: () => { localStorage.setItem("nova:expok", "1"); after(); },
+  });
+}
+
+/* ---------- Reusable confirm modal ---------- */
+function showModal({ title, body, confirmText, cancelText, onConfirm }) {
+  $("#modalTitle").textContent = title;
+  $("#modalBody").textContent = body;
+  const ok = $("#modalConfirm");
+  const cancel = $("#modalCancel");
+  ok.textContent = confirmText || "Confirm";
+  cancel.textContent = cancelText || "Cancel";
+  $("#modalOverlay").hidden = false;
+  const close = () => { $("#modalOverlay").hidden = true; ok.onclick = cancel.onclick = null; };
+  ok.onclick = () => { close(); onConfirm && onConfirm(); };
+  cancel.onclick = close;
 }
 
 /* ============================================================
@@ -808,6 +879,9 @@ function wire() {
     else if (!$("#playerDesc").hidden) $("#playerDesc").hidden = true;
     else if (!$("#playerOverlay").hidden) closePlayer();
   });
+
+  $("#adultToggle").onclick = requestAdult;
+  $("#modalOverlay").onclick = (e) => { if (e.target.id === "modalOverlay") $("#modalOverlay").hidden = true; };
 
   $("#menuToggle").onclick = () => $("#sidebar").classList.toggle("open");
 }
