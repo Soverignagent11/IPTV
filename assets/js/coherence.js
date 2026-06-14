@@ -20,6 +20,23 @@
     favorites: "Favorites",
   };
 
+  const NAV_ORDER = [
+    '[data-view="signalverse"]',
+    '[data-view="discover"]',
+    '[data-guide-view="guide"]',
+    '[data-radio-view="radio"]',
+    '[data-view="wall"]',
+    '[data-view="favorites"]',
+    '[data-view="categories"]',
+    '[data-view="countries"]',
+    '[data-firewall-view="firewall"]',
+    '[data-api-view="apis"]',
+    'a[href="lab.html"]',
+  ];
+
+  let reorderQueued = false;
+  let reordering = false;
+
   window.addEventListener("DOMContentLoaded", () => {
     labelNavigation();
     observeDynamicNavigation();
@@ -58,30 +75,51 @@
     const nav = q(".nav-list");
     if (!nav) return;
     const observer = new MutationObserver(() => {
+      if (reordering) return;
       labelNavigation();
+      queueReorder();
+    });
+    observer.observe(nav, { childList: true });
+    queueReorder();
+  }
+
+  function queueReorder() {
+    if (reorderQueued) return;
+    reorderQueued = true;
+    requestAnimationFrame(() => {
+      reorderQueued = false;
       reorderNav();
     });
-    observer.observe(nav, { childList: true, subtree: true });
-    reorderNav();
   }
 
   function reorderNav() {
     const nav = q(".nav-list");
     if (!nav) return;
-    const order = [
-      '[data-view="signalverse"]',
-      '[data-view="discover"]',
-      '[data-guide-view="guide"]',
-      '[data-radio-view="radio"]',
-      '[data-view="wall"]',
-      '[data-view="favorites"]',
-      '[data-view="categories"]',
-      '[data-view="countries"]',
-      '[data-firewall-view="firewall"]',
-      '[data-api-view="apis"]',
-      'a[href="lab.html"]',
-    ];
-    order.map((selector) => q(selector, nav)).filter(Boolean).forEach((node) => nav.appendChild(node));
+
+    const ordered = NAV_ORDER.map((selector) => q(selector, nav)).filter(Boolean);
+    const known = new Set(ordered);
+    const extra = [...nav.children].filter((node) => !known.has(node));
+    const desired = [...ordered, ...extra];
+    const current = [...nav.children];
+
+    if (sameOrder(current, desired)) return;
+
+    const scrollLeft = nav.scrollLeft;
+    reordering = true;
+    const fragment = document.createDocumentFragment();
+    desired.forEach((node) => fragment.appendChild(node));
+    nav.appendChild(fragment);
+    nav.scrollLeft = scrollLeft;
+    requestAnimationFrame(() => {
+      nav.scrollLeft = scrollLeft;
+      reordering = false;
+      labelNavigation();
+    });
+  }
+
+  function sameOrder(a, b) {
+    if (a.length !== b.length) return false;
+    return a.every((node, index) => node === b[index]);
   }
 
   function patchFeatureCopy() {
