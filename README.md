@@ -3,7 +3,7 @@
 Nova TV is a self-contained, static public live-TV browser designed for **GitHub Pages**.
 It uses public channel and stream metadata from the open-source **[iptv-org](https://github.com/iptv-org/iptv)** project and plays compatible HLS streams in the browser with **[hls.js](https://github.com/video-dev/hls.js)**.
 
-Build 34 expands Signalverse with **Nova Radio**, a **Source Firewall**, the premium **Channel Guide**, and the legal **Free TV API Hub**. Nova is still safe-by-default: no backend, no accounts, no tracking, no adult toggle, and no built-in pirate IPTV feeds.
+Build 35 expands Signalverse with **Nova Radio**, a **Source Firewall**, the premium **Channel Guide**, the legal **Free TV API Hub**, and a product-wide **Coherence Layer**. Nova is still safe-by-default: no backend, no accounts, no tracking, no adult toggle, and no built-in pirate IPTV feeds.
 
 ![Static](https://img.shields.io/badge/100%25-static-success) ![No backend](https://img.shields.io/badge/backend-none-blue) ![Safe public mode](https://img.shields.io/badge/safe-public_mode-green) ![License MIT](https://img.shields.io/badge/license-MIT-green)
 
@@ -21,6 +21,14 @@ Build 34 expands Signalverse with **Nova Radio**, a **Source Firewall**, the pre
   - full-width mobile layout
   - bottom mobile navigation
   - large readable cards and touch targets
+
+- **Product Coherence Layer**
+  - consistent nav labels and tooltips
+  - stable dynamic tab order
+  - feature pages no longer fight the main app state
+  - unified search copy and page hierarchy
+  - stronger mobile bottom-bar behavior
+  - shared focus styling across search, scanner, radio, API, and firewall inputs
 
 - **Channel Guide**
   - guide tab added dynamically
@@ -77,7 +85,7 @@ Build 34 expands Signalverse with **Nova Radio**, a **Source Firewall**, the pre
 ## Features
 
 - Signalverse live-signal home
-- Search / scan channels, countries, and categories
+- Search / scan channels, guide, radio, countries, and categories
 - Category and country browse layers
 - Channel Guide
 - Nova Radio
@@ -133,12 +141,14 @@ assets/css/guide.css             # Channel Guide layer
 assets/css/radio.css             # Nova Radio layer
 assets/css/source-firewall.css   # Source Firewall layer
 assets/css/api-sources.css       # Free TV API Hub styles
+assets/css/coherence.css         # Product coherence polish layer
 assets/js/app.js                 # data loading, signal field, scanner, player, Signal Wall
 assets/js/guide.js               # Channel Guide logic
 assets/js/radio.js               # Legal internet radio logic
 assets/js/source-firewall.js     # Local M3U scan/quarantine logic
 assets/js/free-tv-apis.js        # Legal/free TV API hub
 assets/js/nav-state.js           # Global nav active-state guard
+assets/js/coherence.js           # Dynamic nav/order/copy coherence guard
 lab.html                         # standalone Kinetic Optics Lab
 .github/workflows/               # GitHub Pages deployment
 ```
