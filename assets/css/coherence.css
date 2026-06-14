@@ -1,0 +1,200 @@
+/* ============================================================
+ * Nova TV — Product Coherence Layer
+ * Final polish pass: navigation, labels, spacing, and feature consistency.
+ * ============================================================ */
+
+:root {
+  --nav-safe-bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+/* Keep feature pages from feeling like separate apps. */
+.guide-view,
+.radio-view,
+.firewall-view,
+.api-view {
+  margin-top: 4px;
+}
+
+.guide-toolbar,
+.api-toolbar,
+.radio-hero,
+.firewall-panel {
+  max-width: 1320px;
+}
+
+/* Consistent top-of-page information hierarchy. */
+.view-head.inline,
+.view-head {
+  max-width: 1320px;
+}
+
+.view-head .eyebrow + h2,
+.radio-copy h2,
+.firewall-copy h2 {
+  text-wrap: balance;
+}
+
+/* Make all floating/popup inputs feel like the same control family. */
+.search-box,
+.scanner-input,
+.radio-search,
+.api-search-shell,
+.api-key-panel,
+.firewall-textarea {
+  outline: none;
+}
+
+.search-box:focus-within,
+.scanner-input:focus-within,
+.radio-search:focus-within,
+.api-search-shell:focus-within,
+.api-key-panel:focus-within,
+.firewall-textarea:focus {
+  border-color: rgba(142,232,255,.58) !important;
+  box-shadow: 0 0 0 6px rgba(142,232,255,.16), inset 0 1px 0 rgba(255,255,255,.16);
+}
+
+/* Prevent the dynamic feature pages from inheriting old grid ghosts. */
+#guideView[hidden],
+#radioView[hidden],
+#firewallView[hidden],
+#apiSourcesView[hidden] {
+  display: none !important;
+}
+
+/* Desktop nav tooltips using accessible labels. */
+.nav-item {
+  position: relative;
+}
+
+@media (min-width: 701px) {
+  .nav-rail .nav-item::after {
+    content: attr(aria-label);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-4px);
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+    border-radius: 999px;
+    padding: 8px 11px;
+    color: var(--ink);
+    background: rgba(5,8,18,.92);
+    border: 1px solid rgba(255,255,255,.14);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    box-shadow: var(--soft);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0;
+    transition: opacity .16s var(--ease), transform .16s var(--ease);
+  }
+
+  .nav-rail .nav-item:hover::after,
+  .nav-rail .nav-item:focus-visible::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+/* Mobile bottom bar: keep lots of features usable without looking broken. */
+@media (max-width: 700px) {
+  .nav-rail {
+    height: 76px;
+    overflow: hidden;
+  }
+
+  .nav-list {
+    display: flex !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 7px;
+    height: 100%;
+    padding: 0 2px 2px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .nav-list::-webkit-scrollbar { display: none; }
+
+  .nav-item {
+    flex: 0 0 58px;
+    width: 58px !important;
+    height: 58px !important;
+    min-height: 58px !important;
+    border-radius: 21px;
+    display: grid !important;
+    place-items: center;
+    scroll-snap-align: center;
+  }
+
+  .nav-item span {
+    font-size: 20px !important;
+    line-height: 1;
+  }
+
+  .nav-item.active {
+    background:
+      radial-gradient(circle at 50% 20%, rgba(255,255,255,.22), transparent 42%),
+      linear-gradient(120deg, rgba(142,232,255,.28), rgba(182,156,255,.13));
+    border-color: rgba(142,232,255,.46);
+  }
+
+  .nav-item.active::before {
+    content: "";
+    position: absolute;
+    bottom: 5px;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    transform: translateX(-50%);
+    background: var(--a);
+    box-shadow: 0 0 12px var(--a);
+  }
+
+  .app {
+    padding-bottom: calc(106px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .command-bar {
+    box-shadow: var(--soft), inset 0 1px 0 rgba(255,255,255,.14);
+  }
+
+  .guide-view,
+  .radio-view,
+  .firewall-view,
+  .api-view {
+    padding-bottom: 4px;
+  }
+
+  .view-count {
+    font-size: 12px;
+  }
+
+  .api-provider-card,
+  .radio-card,
+  .firewall-row,
+  .guide-row {
+    box-shadow: var(--soft), inset 0 1px 0 rgba(255,255,255,.10);
+  }
+}
+
+/* Consistent empty/status cards. */
+.api-status,
+.radio-status,
+.firewall-row,
+.guide-empty,
+.state {
+  border-radius: 24px;
+}
+
+/* Safety language should be visible but not shouty. */
+.source-note,
+.firewall-note,
+.api-note,
+.guide-note {
+  color: rgba(226,235,255,.66);
+}
