@@ -241,15 +241,13 @@ function renderHome() {
   teardownMultiview();
   $("#ondemand").hidden = true;
   state.view = "home";
-  $("#hero").hidden = false;
+  $("#hero").hidden = true;
+  pauseHero();
   $("#gridHead").hidden = true;
   $("#grid").innerHTML = "";
+  startSurf();                       // immersive reel is the home
   const rows = $("#rows");
   rows.innerHTML = "";
-  ensureHero();
-
-  const spotlight = buildSpotlight();
-  if (spotlight) rows.appendChild(spotlight);
 
   if (state.recent.length) {
     const rec = state.recent.map((id) => state.byId.get(id)).filter(Boolean);
@@ -373,6 +371,7 @@ function buildCard(c) {
 function renderGrid(title, channels) {
   teardownMultiview();
   pauseHero();
+  teardownSurf();
   $("#ondemand").hidden = true;
   state.view = "other";
   $("#hero").hidden = true;
@@ -407,6 +406,7 @@ function showCountry(code) {
 function renderBrowse(kind) {
   teardownMultiview();
   pauseHero();
+  teardownSurf();
   $("#ondemand").hidden = true;
   state.view = "other";
   $("#hero").hidden = true;
@@ -498,6 +498,7 @@ function openPlayer(c) {
 
 function openPlayerNow(c) {
   currentChannel = c;
+  pauseSurf();
   $("#playerOverlay").hidden = false;
   document.body.style.overflow = "hidden";
   $("#playerTitle").textContent = c.name;
@@ -645,7 +646,9 @@ function closePlayer() {
   document.body.style.overflow = "";
   destroyHls();
   stopAura();
-  if (state.view === "home") resumeHero(); else auraIdle();
+  if (state.view === "home" && !$("#surf").hidden) resumeSurf();
+  else if (state.view === "home") resumeHero();
+  else auraIdle();
 }
 
 /* ============================================================
@@ -726,6 +729,7 @@ const mvHls = new Map();   // tile index -> Hls instance
 function renderMultiview() {
   setActiveNav("multiview");
   pauseHero();
+  teardownSurf();
   state.view = "other";
   $("#hero").hidden = true;
   $("#ondemand").hidden = true;
@@ -1013,7 +1017,7 @@ const ARCHIVE_ROWS = [
 
 function renderOnDemand() {
   setActiveNav("ondemand"); state.view = "other";
-  pauseHero(); teardownMultiview(); auraIdle();
+  pauseHero(); teardownSurf(); teardownMultiview(); auraIdle();
   $("#hero").hidden = true; $("#rows").innerHTML = ""; $("#gridHead").hidden = true; $("#grid").innerHTML = ""; hide("#empty");
   const od = $("#ondemand"); od.hidden = false;
   od.innerHTML =
@@ -1103,6 +1107,70 @@ function go(fn) {
 }
 
 /* ============================================================
+ * Surf reel — immersive, one-channel-at-a-time home
+ * ============================================================ */
+let surf = { list: [], i: 0, hls: null, muted: true, to: 0, current: null };
+
+function surfPool() {
+  const fast = state.channels.filter((c) => c.provider && !c.nsfw);          // reliable first
+  const rest = state.channels.filter((c) => !c.provider && c.logo && !c.nsfw);
+  return [...shuffle(fast), ...shuffle(rest)];
+}
+function startSurf() {
+  $("#surf").hidden = false;
+  if (!surf.list.length) { surf.list = surfPool(); surf.i = 0; }
+  surfLoad();
+}
+function surfLoad() {
+  const c = surf.list[surf.i];
+  if (!c) return;
+  surf.current = c;
+  const surfEl = $("#surf");
+  surfEl.classList.remove("ready");
+  $("#surfName").textContent = c.name;
+  $("#surfMeta").textContent = `${c.flag ? c.flag + " " : ""}${c.countryName || ""} · ${c.categories.map((x) => state.catName.get(x) || x)[0] || "Live"}`;
+  $("#surfLogo").src = c.logo || ""; $("#surfLogo").style.visibility = c.logo ? "visible" : "hidden";
+  $("#surfFav").classList.toggle("on", state.favorites.has(c.id));
+  $("#surfLoading").style.display = "grid";
+  auraFromChannel(c);                 // instant colour, before pixels arrive
+  if (surf.hls) { surf.hls.destroy(); surf.hls = null; }
+  const v = $("#surfVideo");
+  v.muted = surf.muted;
+  surf.hls = streamInto(v, c.urls, () => {
+    clearTimeout(surf.to);
+    $("#surfLoading").style.display = "none";
+    surfEl.classList.add("ready");
+    v.muted = surf.muted;
+    v.play().catch(() => { surf.muted = true; v.muted = true; updateSurfMute(); v.play().catch(() => {}); });
+    startAura(v);
+  });
+  // If nothing plays within a few seconds, surf onward automatically.
+  clearTimeout(surf.to);
+  surf.to = setTimeout(() => { if (!surfEl.classList.contains("ready")) surfGo(1); }, 9000);
+}
+function surfGo(dir) {
+  if (!surf.list.length) return;
+  surf.i = (surf.i + dir + surf.list.length) % surf.list.length;
+  surfLoad();
+}
+function updateSurfMute() {
+  const b = $("#surfMute");
+  if (!b) return;
+  b.textContent = surf.muted ? "🔇" : "🔊";
+  b.classList.toggle("on", !surf.muted);
+}
+function pauseSurf() { const v = $("#surfVideo"); v.pause(); if (auraVideo === v) stopAura(); }
+function resumeSurf() { const v = $("#surfVideo"); if (!$("#surf").hidden) { v.play().catch(() => {}); startAura(v); } }
+function teardownSurf() {
+  if (surf.hls) { surf.hls.destroy(); surf.hls = null; }
+  clearTimeout(surf.to);
+  const v = $("#surfVideo"); v.pause();
+  try { v.removeAttribute("src"); v.load(); } catch (e) {}
+  if (auraVideo === v) stopAura();
+  $("#surf").hidden = true;
+}
+
+/* ============================================================
  * Navigation / wiring
  * ============================================================ */
 function navTo(v) {
@@ -1144,6 +1212,35 @@ function wire() {
   document.addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#cmdOverlay").hidden ? openCmd() : closeCmd(); }
   });
+  // Surf reel
+  $("#surfPrev").onclick = () => surfGo(-1);
+  $("#surfNext").onclick = () => surfGo(1);
+  $("#surfExpand").onclick = () => { if (surf.current) openPlayer(surf.current); };
+  $("#surfMute").onclick = () => {
+    surf.muted = !surf.muted; const v = $("#surfVideo"); v.muted = surf.muted;
+    if (!surf.muted) v.play().catch(() => {});
+    updateSurfMute();
+  };
+  $("#surfFav").onclick = () => {
+    if (!surf.current) return;
+    const id = surf.current.id;
+    toggleFav(id); const on = state.favorites.has(id); $("#surfFav").classList.toggle("on", on);
+    toast(on ? "★ Added to favorites" : "Removed from favorites", "Undo", () => { toggleFav(id); $("#surfFav").classList.toggle("on", state.favorites.has(id)); });
+  };
+  updateSurfMute();
+  const surfEl = $("#surf");
+  let sy0 = null;
+  surfEl.addEventListener("touchstart", (e) => { sy0 = e.touches[0].clientY; }, { passive: true });
+  surfEl.addEventListener("touchend", (e) => { if (sy0 == null) return; const dy = e.changedTouches[0].clientY - sy0; if (Math.abs(dy) > 55) surfGo(dy < 0 ? 1 : -1); sy0 = null; }, { passive: true });
+  let wheelLock = false;
+  surfEl.addEventListener("wheel", (e) => { if (wheelLock || Math.abs(e.deltaY) < 12) return; wheelLock = true; setTimeout(() => (wheelLock = false), 700); surfGo(e.deltaY > 0 ? 1 : -1); }, { passive: true });
+  document.addEventListener("keydown", (e) => {
+    if (state.view !== "home" || $("#surf").hidden) return;
+    if (!$("#playerOverlay").hidden || !$("#cmdOverlay").hidden || !$("#pickerOverlay").hidden || !$("#modalOverlay").hidden) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); surfGo(1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); surfGo(-1); }
+  });
+
   $("#cmdBtn").onclick = openCmd;
   $("#cmdClose").onclick = closeCmd;
   $("#cmdOverlay").onclick = (e) => { if (e.target.id === "cmdOverlay") closeCmd(); };
