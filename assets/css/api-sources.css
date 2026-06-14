@@ -1,0 +1,302 @@
+/* ============================================================
+ * Nova TV — Free TV API Hub styles
+ * Legal/free TV metadata API layer. No piracy feeds.
+ * ============================================================ */
+
+.api-view {
+  animation: apiFade .22s var(--ease) both;
+}
+
+.api-toolbar {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.api-search-shell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 999px;
+  padding: 8px;
+  background: var(--mat);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(var(--blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(150%);
+  box-shadow: var(--soft), inset 0 1px 0 rgba(255,255,255,.14);
+}
+
+.api-search-shell span {
+  padding-left: 10px;
+  color: var(--muted);
+}
+
+.api-search-shell input {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+.api-search-shell button {
+  flex: 0 0 auto;
+}
+
+.api-provider-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 10px;
+}
+
+.api-toggle {
+  appearance: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: rgba(255,255,255,.07);
+  border-radius: 999px;
+  min-height: 40px;
+  padding: 0 13px;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform .16s var(--spring), border-color .2s var(--ease), background .2s var(--ease), color .2s var(--ease);
+}
+
+.api-toggle.active,
+.api-toggle:hover {
+  color: var(--ink);
+  border-color: rgba(142,232,255,.48);
+  background: rgba(142,232,255,.14);
+}
+
+.api-note {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.48;
+  max-width: 900px;
+}
+
+.api-key-panel {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  border-radius: 24px;
+  padding: 12px;
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.11);
+}
+
+.api-key-panel label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.api-key-panel input {
+  height: 44px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.22);
+  padding: 0 12px;
+}
+
+.api-providers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  margin: 0 0 22px;
+}
+
+.api-provider-card {
+  min-height: 184px;
+  border-radius: 28px;
+  padding: 18px;
+  background: var(--mat);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(var(--blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(150%);
+  box-shadow: var(--soft), inset 0 1px 0 rgba(255,255,255,.14);
+  position: relative;
+  overflow: hidden;
+}
+
+.api-provider-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .75;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(142,232,255,.15), transparent 30%),
+    radial-gradient(circle at 90% 0%, rgba(182,156,255,.12), transparent 28%);
+}
+
+.api-provider-card > * { position: relative; z-index: 1; }
+
+.api-provider-card h3 {
+  font-size: 20px;
+  letter-spacing: -.045em;
+  margin-bottom: 8px;
+}
+
+.api-provider-card p {
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 13px;
+}
+
+.api-provider-card .api-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.api-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 6px 8px;
+  background: rgba(255,255,255,.075);
+  border: 1px solid rgba(255,255,255,.10);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.api-badge.good { color: #dffff0; border-color: rgba(142,249,180,.25); background: rgba(142,249,180,.10); }
+.api-badge.key { color: #fff0ca; border-color: rgba(255,210,122,.25); background: rgba(255,210,122,.10); }
+
+.api-results {
+  display: grid;
+  gap: 12px;
+}
+
+.api-result-card {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 12px;
+  background: rgba(255,255,255,.055);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform .16s var(--spring), border-color .2s var(--ease), background .2s var(--ease);
+}
+
+.api-result-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(142,232,255,.42);
+  background: rgba(142,232,255,.09);
+}
+
+.api-result-art {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(142,232,255,.26), rgba(182,156,255,.24)), rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.api-result-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.api-result-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.api-result-copy b {
+  display: block;
+  font-size: 15px;
+  letter-spacing: -.025em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.api-result-copy span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.api-result-provider {
+  color: var(--a);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.api-status {
+  color: var(--muted);
+  padding: 20px;
+  border-radius: 22px;
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.09);
+}
+
+@keyframes apiFade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 700px) {
+  .api-search-shell {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    border-radius: 24px;
+  }
+
+  .api-search-shell button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .api-key-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .api-key-panel .secondary-action {
+    width: 100%;
+  }
+
+  .api-providers {
+    grid-template-columns: 1fr;
+  }
+
+  .api-result-art {
+    width: 56px;
+    height: 56px;
+  }
+
+  .api-result-copy b {
+    font-size: 14px;
+  }
+}
