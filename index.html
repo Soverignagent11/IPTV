@@ -13,11 +13,12 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="preconnect" href="https://all.api.radio-browser.info" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='30' fill='%23040611'/%3E%3Ccircle cx='60' cy='60' r='42' fill='%238ee8ff' fill-opacity='.17'/%3E%3Ccircle cx='60' cy='60' r='7' fill='%23fff'/%3E%3Cpath d='M60 22v17M60 81v17M22 60h17M81 60h17M33 33l12 12M75 75l12 12M87 33 75 45M45 75 33 87' stroke='%23fff' stroke-width='6' stroke-linecap='round' opacity='.9'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="assets/css/style.css?v=34" />
-  <link rel="stylesheet" href="assets/css/guide.css?v=34" />
-  <link rel="stylesheet" href="assets/css/radio.css?v=34" />
-  <link rel="stylesheet" href="assets/css/source-firewall.css?v=34" />
-  <link rel="stylesheet" href="assets/css/api-sources.css?v=34" />
+  <link rel="stylesheet" href="assets/css/style.css?v=35" />
+  <link rel="stylesheet" href="assets/css/guide.css?v=35" />
+  <link rel="stylesheet" href="assets/css/radio.css?v=35" />
+  <link rel="stylesheet" href="assets/css/source-firewall.css?v=35" />
+  <link rel="stylesheet" href="assets/css/api-sources.css?v=35" />
+  <link rel="stylesheet" href="assets/css/coherence.css?v=35" />
 </head>
 <body>
   <canvas id="starfield" aria-hidden="true"></canvas>
@@ -50,14 +51,14 @@
       <div><b>Safe public mode</b><p>Adult/NSFW listings stay filtered. Nova does not host streams or bypass regional rights.</p></div>
     </section>
 
-    <footer class="rail-foot"><b>Build 34</b><span>No backend · local favorites · public metadata</span></footer>
+    <footer class="rail-foot"><b>Build 35</b><span>No backend · local favorites · public metadata</span></footer>
   </aside>
 
   <main class="app" id="app">
     <header class="command-bar material" id="commandBar">
       <label class="search-box" for="searchInput">
         <span aria-hidden="true">⌕</span>
-        <input id="searchInput" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Scan channels, countries, categories…" />
+        <input id="searchInput" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Search channels, guide, radio, countries…" />
         <button class="clear-search" id="searchClear" type="button" aria-label="Clear search" hidden>×</button>
       </label>
       <button class="pill-btn" id="cmdBtn" type="button">Scanner <kbd>⌘K</kbd></button>
@@ -67,9 +68,9 @@
 
     <section class="signalverse" id="signalverse" aria-label="Live signal universe">
       <div class="signal-copy">
-        <span class="eyebrow"><i></i> Live public signal field</span>
+        <span class="eyebrow"><i></i> Public signal field</span>
         <h1>Don’t browse channels. <span>Scan signals.</span></h1>
-        <p>Nova now opens as a living broadcast field. Pull a signal into focus, preview it, favorite it, or expand it into the player.</p>
+        <p>Nova opens as a living broadcast field. Pull a signal into focus, preview it, favorite it, or expand it into the player.</p>
         <div class="signal-actions">
           <button class="primary-action" id="scanStrong" type="button">Scan strong signals</button>
           <button class="secondary-action" id="scanFar" type="button">Jump far away</button>
@@ -107,7 +108,7 @@
     </section>
 
     <section class="view-head" id="viewHead" hidden>
-      <div><span class="eyebrow mini"><i></i> Browse layer</span><h2 id="viewTitle">Discover</h2></div>
+      <div><span class="eyebrow mini"><i></i> Browse</span><h2 id="viewTitle">Discover</h2></div>
       <span class="view-count" id="viewCount"></span>
     </section>
 
@@ -116,7 +117,7 @@
 
     <section class="wall" id="wall" hidden>
       <div class="view-head inline">
-        <div><span class="eyebrow mini"><i></i> Signal Wall</span><h2>Multi-stream wall</h2></div>
+        <div><span class="eyebrow mini"><i></i> Signal Wall</span><h2>Multi-stream Wall</h2></div>
         <div class="segmented" aria-label="Signal wall layout">
           <button type="button" class="seg-btn" data-cols="1">1×</button>
           <button type="button" class="seg-btn active" data-cols="2">2×</button>
@@ -154,7 +155,7 @@
 
   <section class="overlay" id="commandOverlay" hidden role="dialog" aria-modal="true" aria-label="Signal scanner">
     <div class="scanner material">
-      <label class="scanner-input" for="commandInput"><span>⌘</span><input id="commandInput" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Scan: sports, Canada, news, random…" /><button class="icon-btn close" id="cmdClose" type="button" aria-label="Close scanner">×</button></label>
+      <label class="scanner-input" for="commandInput"><span>⌘</span><input id="commandInput" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Scan: sports, Canada, radio, guide…" /><button class="icon-btn close" id="cmdClose" type="button" aria-label="Close scanner">×</button></label>
       <div class="scanner-results" id="commandResults"></div>
     </div>
   </section>
@@ -169,11 +170,12 @@
   <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
-  <script src="assets/js/app.js?v=34"></script>
-  <script src="assets/js/guide.js?v=34"></script>
-  <script src="assets/js/radio.js?v=34"></script>
-  <script src="assets/js/source-firewall.js?v=34"></script>
-  <script src="assets/js/free-tv-apis.js?v=34"></script>
-  <script src="assets/js/nav-state.js?v=34"></script>
+  <script src="assets/js/app.js?v=35"></script>
+  <script src="assets/js/nav-state.js?v=35"></script>
+  <script src="assets/js/guide.js?v=35"></script>
+  <script src="assets/js/radio.js?v=35"></script>
+  <script src="assets/js/source-firewall.js?v=35"></script>
+  <script src="assets/js/free-tv-apis.js?v=35"></script>
+  <script src="assets/js/coherence.js?v=35"></script>
 </body>
 </html>
