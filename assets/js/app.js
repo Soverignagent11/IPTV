@@ -239,15 +239,17 @@ function renderQuickCategories() {
 function renderHome() {
   setActiveNav("home");
   teardownMultiview();
+  teardownSurf();
   $("#ondemand").hidden = true;
   state.view = "home";
-  $("#hero").hidden = true;
-  pauseHero();
+  $("#hero").hidden = false;
   $("#gridHead").hidden = true;
   $("#grid").innerHTML = "";
-  startSurf();                       // immersive reel is the home
   const rows = $("#rows");
   rows.innerHTML = "";
+  ensureHero();
+  const spotlight = buildSpotlight();
+  if (spotlight) rows.appendChild(spotlight);
 
   if (state.recent.length) {
     const rec = state.recent.map((id) => state.byId.get(id)).filter(Boolean);
@@ -892,7 +894,7 @@ function setAura(a1, a2, a3) {
   const s = document.documentElement.style;
   s.setProperty("--aura-1", a1); s.setProperty("--aura-2", a2); s.setProperty("--aura-3", a3);
 }
-function auraIdle() { setAura("#7c6cff", "#2dd4bf", "#1b2a6b"); }
+function auraIdle() { setAura("#ff4d8d", "#9b6bff", "#ffb24d"); }
 function auraFromChannel(c) {
   let hue = 250;
   for (const cat of (c && c.categories) || []) { if (CAT_HUE[cat] != null) { hue = CAT_HUE[cat]; break; } }
